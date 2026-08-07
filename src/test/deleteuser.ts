@@ -1,4 +1,4 @@
-import { prisma } from '../scripts/connectdb';
+import { prisma } from '../scripts/connectdb.js';
 
 async function main() {
   const result = await prisma.user.deleteMany({
@@ -7,7 +7,12 @@ async function main() {
     },
   });
 
-  console.log(`Deleted ${result.count} test user(s).`);
+  if (result.count === 0) {
+    console.log('Test user does not exist.');
+    return;
+  }
+
+  console.log('Test user deleted.');
 }
 
 main()

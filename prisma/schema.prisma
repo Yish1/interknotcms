@@ -8,24 +8,23 @@ datasource db {
 }
 
 model User {
-  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
 
-  username     String    @unique @db.Citext
-  email        String    @unique @db.Citext
-  passwordHash String    @map("password_hash") @db.VarChar(255)
+  username     String @unique @db.Citext
+  email        String @unique @db.Citext
+  passwordHash String @map("password_hash") @db.VarChar(255)
 
-  avatar       String?   @db.VarChar(500)
+  avatar String? @db.VarChar(500)
 
-  role         UserRole  @default(user)
-  isActive     Boolean   @default(true) @map("is_active")
+  role     UserRole @default(user)
+  isActive Boolean  @default(true) @map("is_active")
 
-  lastLoginAt  DateTime? @map("last_login_at") @db.Timestamptz(3)
-  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
-  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz(3)
+  lastLoginAt DateTime? @map("last_login_at") @db.Timestamptz(3)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(3)
 
   @@index([role])
   @@index([deletedAt])
-
   @@map("users")
 }
 

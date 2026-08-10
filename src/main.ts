@@ -11,7 +11,7 @@ async function bootstrap() {
 
   // 启用 CORS
   app.enableCors({
-    origin: process.env.CORS_ORIGIN || '*', // 允许的来源，可以根据需要进行配置
+    origin: process.env.CORS_ORIGIN?.split(',').map((origin) => origin.trim()), // 允许的来源，可以根据需要进行配置
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE', // 允许的 HTTP 方法
     allowedHeaders: 'Content-Type, Accept, Authorization', // 允许的请求头
   });

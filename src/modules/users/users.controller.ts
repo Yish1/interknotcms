@@ -20,6 +20,7 @@ export class UsersController {
     async findOne(@Param('username') username: string) {
         const user = await this.usersService.findOne(username);
         return {
+            message: 'User retrieved successfully',
             data: user,
         };
     }
@@ -29,6 +30,7 @@ export class UsersController {
         const user = await this.usersService.createUser(createUserDto);
 
         return {
+            message: 'User created successfully',
             data: user,
         };
     }
@@ -38,6 +40,7 @@ export class UsersController {
         const user = await this.usersService.updateUser(username, updateUserDto);
 
         return {
+            message: 'User updated successfully',
             data: user,
         };
     }

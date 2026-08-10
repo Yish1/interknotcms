@@ -28,9 +28,9 @@ export class PrismaService
     async onModuleInit(): Promise<void> {
         try {
             await this.$connect();
-            console.log('✅ Database connected');
+            console.log('Database connected successfully');
         } catch (error) {
-            console.error('❌ Failed to connect to database:', error);
+            console.error('Failed to connect to database:', error);
             throw error;
         }
     }

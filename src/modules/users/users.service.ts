@@ -18,6 +18,7 @@ export class UsersService {
         role: true,
         isActive: true,
         lastLoginAt: true,
+        authVersion: true,
     };
 
     async findAll() {
@@ -68,7 +69,12 @@ export class UsersService {
 
         const data = {
             ...rest,
-            ...(password ? { passwordHash: await argon2.hash(password) } : {}),
+            ...(password ? { 
+                passwordHash: await argon2.hash(password),
+                authVersion: { 
+                    increment: 1 
+                }
+             } : {}),
         }
 
         return this.prisma.user.update({

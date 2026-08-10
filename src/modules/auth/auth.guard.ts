@@ -5,11 +5,13 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { PrismaService } from '../../prisma/prisma.service.js';
 
 @Injectable()
 export class AuthGuard implements CanActivate {
   constructor(
     private readonly jwtService: JwtService,
+    private readonly prisma: PrismaService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -21,13 +23,27 @@ export class AuthGuard implements CanActivate {
       throw new UnauthorizedException('Token not found');
     }
 
+    let payload;
     try {
-      const payload = await this.jwtService.verifyAsync(token);
-
-      request.user = payload;
+      payload = await this.jwtService.verifyAsync(token);
     } catch {
       throw new UnauthorizedException('Invalid or expired token');
     }
+
+      const user = await this.prisma.user.findUnique({
+        where: { id: payload.sub },
+      });
+
+      if (!user || !user.isActive || user.deletedAt) {
+        throw new UnauthorizedException('User not found or inactive');
+      }
+
+      if (user.authVersion !== payload.authVersion) {
+        throw new UnauthorizedException('Token is no longer valid');
+      }
+
+      request.user = payload;
+
 
     return true;
   }

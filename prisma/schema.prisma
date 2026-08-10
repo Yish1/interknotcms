@@ -16,14 +16,13 @@ model User {
 
   avatar String? @db.VarChar(500)
 
-  role     UserRole @default(user)
-  isActive Boolean  @default(true) @map("is_active")
+  role        UserRole @default(user)
+  isActive    Boolean  @default(true) @map("is_active")
+  authVersion Int      @default(0) @map("auth_version")
 
   lastLoginAt DateTime? @map("last_login_at") @db.Timestamptz(3)
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(3)
-
-  posts         Post[]
 
   @@index([role])
   @@index([deletedAt])

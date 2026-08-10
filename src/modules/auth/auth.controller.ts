@@ -17,6 +17,12 @@ export class AuthController {
     }
 
     @UseGuards(AuthGuard)
+    @Post('logout')
+    async logout(@Req() request: any) {
+        return this.authService.logout(request.user.sub);
+    }
+
+    @UseGuards(AuthGuard)
     @Get('me')
     async me(@Req() request: any) {
         return {

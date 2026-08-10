@@ -44,11 +44,11 @@ export class AuthService {
 
     const { passwordHash, ...userWithoutPassword } = user;
 
-    const payload = { 
-        sub: user.id, 
-        username: user.username, 
-        role: user.role,
-        authVersion: user.authVersion,
+    const payload = {
+      sub: user.id,
+      username: user.username,
+      role: user.role,
+      authVersion: user.authVersion,
     };
     const accessToken = await this.jwtService.signAsync(payload);
 
@@ -57,4 +57,18 @@ export class AuthService {
       accessToken,
     };
   }
+  async logout(userId: string) {
+    await this.prisma.user.update({
+        where: {
+            id: userId,
+        },
+        data: {
+            authVersion: { increment: 1 },
+        },
+    })
+
+    return {
+        message: 'Logout successful',
+    }
+    };
 }

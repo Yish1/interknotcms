@@ -1,6 +1,7 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Post, Req, UseGuards, Get } from '@nestjs/common';
 import { AuthService } from './auth.service.js';
 import { LoginDto } from './dto/login.dto.js';
+import { AuthGuard } from './auth.guard.js';
 
 @Controller('auth')
 export class AuthController {
@@ -12,6 +13,15 @@ export class AuthController {
         return {
             message: 'Login successful',
             data: result,
+        };
+    }
+
+    @UseGuards(AuthGuard)
+    @Get('me')
+    async me(@Req() request: any) {
+        return {
+            message: 'Profile retrieved successfully',
+            data: request.user,
         };
     }
 }

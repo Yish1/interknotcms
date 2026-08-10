@@ -16,6 +16,9 @@ async function bootstrap() {
     allowedHeaders: 'Content-Type, Accept, Authorization', // 允许的请求头
   });
 
+  // 设置全局路由为/api/
+  app.setGlobalPrefix('api');
+
   // 开启输入校验
   app.useGlobalPipes(new ValidationPipe({
     whitelist: true, // 自动去除 DTO 中未定义的属性

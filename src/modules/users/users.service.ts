@@ -1,6 +1,7 @@
 import { ConflictException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { CreateUserDto } from './dto/create-user.dto.js';
+import { UpdateUserDto } from './dto/update-user.dto.js';
 import * as argon2 from 'argon2';
 import { Prisma } from '../../generated/prisma/client.js';
 
@@ -57,6 +58,37 @@ export class UsersService {
                 if (error.code === 'P2002') {
                     throw new ConflictException('Username or email already exists');
                 }
+            }
+            throw error;
+        }
+    }
+
+    async updateUser(username: string, updateUserDto: UpdateUserDto) {
+        return this.prisma.user.update({
+            where: {
+                username,
+                deletedAt: null,
+            },
+            data: updateUserDto,
+            select: this.selectWithoutPassword
+        });
+    }
+
+    async deleteUser(username: string) {
+        try {
+            return await this.prisma.user.update({
+                where: {
+                    username,
+                    deletedAt: null,
+                },
+                data: {
+                    deletedAt: new Date(),
+                },
+                select: this.selectWithoutPassword
+            });
+        } catch (error) {
+            if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+                throw new ConflictException('User not found or already deleted');
             }
             throw error;
         }

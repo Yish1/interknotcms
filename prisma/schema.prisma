@@ -24,9 +24,81 @@ model User {
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(3)
 
+  posts Post[]
+
   @@index([role])
   @@index([deletedAt])
   @@map("users")
+}
+
+model Post {
+  id       String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  publicId String @unique @map("public_id") @db.VarChar(32)
+
+  title   String  @db.VarChar(100)
+  content String
+  excerpt String? @db.VarChar(100)
+
+  status PostStatus @default(draft)
+
+  authorId String @map("author_id") @db.Uuid
+  author   User   @relation(fields: [authorId], references: [id])
+
+  aliases PostAlias[]
+
+  publishedAt DateTime? @map("published_at") @db.Timestamptz(3)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  tags PostTag[]
+
+  @@index([authorId])
+  @@index([status])
+  @@index([deletedAt])
+  @@map("posts")
+}
+
+model PostAlias {
+  id    String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  alias String @unique @db.VarChar(100)
+
+  postId String @map("post_id") @db.Uuid
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([postId])
+  @@map("post_aliases")
+}
+
+enum PostStatus {
+  draft
+  published
+
+  @@map("post_status")
+}
+
+model Tag {
+  id    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name  String    @unique @db.VarChar(50)
+  posts PostTag[]
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@map("tags")
+}
+
+model PostTag {
+  postId String @map("post_id") @db.Uuid
+  tagId  String @map("tag_id") @db.Uuid
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([postId, tagId])
+  @@index([tagId])
+  @@map("post_tags")
 }
 
 enum UserRole {

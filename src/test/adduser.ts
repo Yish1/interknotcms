@@ -3,25 +3,25 @@ import { hash } from 'argon2';
 import { prisma } from '../scripts/connectdb.js';
 
 async function main() {
-  const password = randomInt(0, 100_000_000).toString().padStart(8, '0');
+  const password = '123456789';
   const passwordHash = await hash(password);
 
   const user = await prisma.user.upsert({
     where: {
-      username: 'admin',
+      username: 'test1',
     },
     update: {
-      email: 'admin@example.com',
+      email: 'test1@example.com',
       passwordHash,
-      role: 'admin',
+      role: 'user',
       deletedAt: null,
       isActive: true,
     },
     create: {
-      username: 'admin',
-      email: 'admin@example.com',
+      username: 'test1',
+      email: 'test1@example.com',
       passwordHash,
-      role: 'admin',
+      role: 'user',
     },
     omit: {
       passwordHash: true,

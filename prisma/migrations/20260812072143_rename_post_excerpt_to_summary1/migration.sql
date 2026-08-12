@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "posts" ALTER COLUMN "summary" SET DATA TYPE VARCHAR(300);

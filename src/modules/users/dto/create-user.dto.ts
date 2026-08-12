@@ -1,4 +1,4 @@
-import { IsEmail, IsNotEmpty, IsString, MinLength, MaxLength, Matches } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsString, IsIn, MinLength, MaxLength, Matches, IsOptional } from 'class-validator';
 
 export class CreateUserDto {
     @IsNotEmpty()
@@ -20,4 +20,15 @@ export class CreateUserDto {
     @MinLength(8)
     @MaxLength(100)
     password!: string;
+
+    @IsOptional()
+    @IsIn(['admin', 'user', 'editor'], {
+        message: 'Role must be one of the following: admin, user, editor',
+    })
+    role?: 'admin' | 'user' | 'editor';
+
+    @IsOptional()
+    @IsString()
+    @Matches(/^\d{11}$/)
+    phone?: string;
 }

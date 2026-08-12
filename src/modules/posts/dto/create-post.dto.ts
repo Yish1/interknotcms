@@ -23,7 +23,7 @@ export class CreatePostDto {
   @IsOptional()
   @IsString()
   @MaxLength(100)
-  excerpt?: string;
+  summary?: string;
 
   @IsIn(['draft', 'published'])
   status?: 'draft' | 'published';

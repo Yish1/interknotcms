@@ -42,6 +42,15 @@ export class AuthService {
       throw new UnauthorizedException('Invalid username or password');
     }
 
+    await this.prisma.user.update({
+      where: {
+        id: user.id,
+      },
+      data: {
+        lastLoginAt: new Date(),
+      },
+    });
+
     const { passwordHash, ...userWithoutPassword } = user;
 
     const payload = {
@@ -57,18 +66,19 @@ export class AuthService {
       accessToken,
     };
   }
+
   async logout(userId: string) {
     await this.prisma.user.update({
-        where: {
-            id: userId,
-        },
-        data: {
-            authVersion: { increment: 1 },
-        },
-    })
+      where: {
+        id: userId,
+      },
+      data: {
+        authVersion: { increment: 1 },
+      },
+    });
 
     return {
-        message: 'Logout successful',
-    }
+      message: 'Logout successful',
     };
+  }
 }

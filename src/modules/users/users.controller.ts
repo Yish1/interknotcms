@@ -1,15 +1,18 @@
-import { Body, Controller, Get, Param, Post, Patch, Delete } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Patch, Delete, UseGuards, Req } from '@nestjs/common';
 import { UsersService } from './users.service.js';
 import { CreateUserDto } from './dto/create-user.dto.js';
 import { UpdateUserDto } from './dto/update-user.dto.js';
+import { AuthGuard } from '../auth/auth.guard.js';
+import { OptionalAuthGuard } from '../auth/optional-auth.guard.js';
 
 @Controller('users')
 export class UsersController {
     constructor(private readonly usersService: UsersService) { }
 
     @Get()
-    async findAll() {
-        const users = await this.usersService.findAll();
+    @UseGuards(AuthGuard)
+    async findAll(@Req() req: any) {
+        const users = await this.usersService.findAll(req.user);
 
         return {
             data: users,
@@ -17,8 +20,9 @@ export class UsersController {
     }
 
     @Get(':username')
-    async findOne(@Param('username') username: string) {
-        const user = await this.usersService.findOne(username);
+    @UseGuards(AuthGuard)
+    async findOne(@Param('username') username: string, @Req() req: any) {
+        const user = await this.usersService.findOne(username, req.user);
         return {
             message: 'User retrieved successfully',
             data: user,
@@ -26,8 +30,9 @@ export class UsersController {
     }
 
     @Post()
-    async create(@Body() createUserDto: CreateUserDto) {
-        const user = await this.usersService.createUser(createUserDto);
+    @UseGuards(OptionalAuthGuard)
+    async create(@Body() createUserDto: CreateUserDto, @Req() req: any) {
+        const user = await this.usersService.createUser(createUserDto, req.user);
 
         return {
             message: 'User created successfully',
@@ -36,8 +41,14 @@ export class UsersController {
     }
     
     @Patch(':username')
-    async update(@Param('username') username: string, @Body() updateUserDto: UpdateUserDto) {
-        const user = await this.usersService.updateUser(username, updateUserDto);
+    @UseGuards(AuthGuard)
+    async update(
+        @Param('username') username: string, 
+        @Body() updateUserDto: UpdateUserDto,
+        @Req() req: any,
+    ) {
+
+        const user = await this.usersService.updateUser(username, updateUserDto, req.user);
 
         return {
             message: 'User updated successfully',
@@ -46,8 +57,9 @@ export class UsersController {
     }
 
     @Delete(':username')
-    async delete(@Param('username') username: string) {
-        const user = await this.usersService.deleteUser(username);
+    @UseGuards(AuthGuard)
+    async delete(@Param('username') username: string, @Req() req: any) {
+        const user = await this.usersService.deleteUser(username, req.user);
 
         return {
             message: 'User deleted successfully',

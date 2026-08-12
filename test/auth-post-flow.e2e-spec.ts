@@ -19,6 +19,7 @@ describe('Authentication and post publishing flow (e2e)', () => {
   let prisma: PrismaService;
   let jwtService: JwtService;
   let userId: string;
+  let deletedUserId: string;
   let originalAccessToken: string;
   let renewedAccessToken: string;
 
@@ -53,12 +54,26 @@ describe('Authentication and post publishing flow (e2e)', () => {
     });
 
     userId = user.id;
+
+    const deletedUser = await prisma.user.create({
+      data: {
+        username: `deleted_${runId}`,
+        email: `deleted_${runId}@example.com`,
+        passwordHash: await argon2.hash('Deleted123!'),
+        deletedAt: new Date(),
+      },
+      select: { id: true },
+    });
+
+    deletedUserId = deletedUser.id;
   });
 
   afterAll(async () => {
     if (prisma && userId) {
       await prisma.post.deleteMany({ where: { authorId: userId } });
-      await prisma.user.deleteMany({ where: { id: userId } });
+      await prisma.user.deleteMany({
+        where: { id: { in: [userId, deletedUserId].filter(Boolean) } },
+      });
       await prisma.tag.deleteMany({ where: { name: { in: tagNames } } });
     }
 
@@ -69,7 +84,7 @@ describe('Authentication and post publishing flow (e2e)', () => {
     const response = await request(app.getHttpServer())
       .post('/api/auth/login')
       .send({ username, password: originalPassword })
-      .expect(201);
+      .expect(200);
 
     expect(response.body.message).toBe('Login successful');
     expect(response.body.data.user.username).toBe(username);
@@ -94,11 +109,14 @@ describe('Authentication and post publishing flow (e2e)', () => {
     const response = await request(app.getHttpServer())
       .patch(`/api/users/${username}`)
       .set('Authorization', `Bearer ${originalAccessToken}`)
-      .send({ password: updatedPassword })
+      .send({
+        oldPassword: originalPassword,
+        password: updatedPassword,
+      })
       .expect(200);
 
     expect(response.body.message).toBe('User updated successfully');
-    expect(response.body.data.authVersion).toBe(1);
+    expect(response.body.data.authVersion).toBeUndefined();
   });
 
   it('rejects the old token after the password changes', async () => {
@@ -112,7 +130,7 @@ describe('Authentication and post publishing flow (e2e)', () => {
     const response = await request(app.getHttpServer())
       .post('/api/auth/login')
       .send({ username, password: updatedPassword })
-      .expect(201);
+      .expect(200);
 
     expect(response.body.data.accessToken).toEqual(expect.any(String));
     renewedAccessToken = response.body.data.accessToken;
@@ -146,10 +164,26 @@ describe('Authentication and post publishing flow (e2e)', () => {
     const response = await request(app.getHttpServer())
       .post('/api/auth/login')
       .send({ username, password: updatedPassword })
-      .expect(201);
+      .expect(200);
 
     renewedAccessToken = response.body.data.accessToken;
     expect(renewedAccessToken).toEqual(expect.any(String));
+  });
+
+  it('returns a clear conflict when creating an already deleted user', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/api/users')
+      .set('Authorization', `Bearer ${renewedAccessToken}`)
+      .send({
+        username: `deleted_${runId}`,
+        email: `another_${runId}@example.com`,
+        password: 'Deleted123!',
+      })
+      .expect(409);
+
+    expect(response.body.message).toBe(
+      'User with this username or email was previously deleted, please contact support to restore your account',
+    );
   });
 
   it('publishes a post with the replacement token', async () => {
@@ -159,7 +193,7 @@ describe('Authentication and post publishing flow (e2e)', () => {
       .send({
         title: 'E2E authentication flow post',
         content: 'This post verifies the complete authenticated workflow.',
-        excerpt: 'Authentication flow test',
+        summary: 'Authentication flow test',
         status: 'published',
         tags: [...tagNames, tagNames[0]],
       })

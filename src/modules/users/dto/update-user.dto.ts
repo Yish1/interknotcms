@@ -1,7 +1,6 @@
-import { IsEmail, IsOptional, IsNotEmpty, IsString, MinLength, MaxLength, Matches } from 'class-validator';
+import { IsEmail, IsOptional, IsString, MinLength, MaxLength, Matches } from 'class-validator';
 
 export class UpdateUserDto {
-    @IsNotEmpty()
     @IsOptional()
     @IsString()
     @MaxLength(32)
@@ -24,6 +23,15 @@ export class UpdateUserDto {
 
     @IsOptional()
     @IsString()
-    @MaxLength(20)
+    @MaxLength(300)
     avatar?: string;
+
+    @IsOptional()
+    @IsString()
+    oldPassword?: string;
+
+    @IsOptional()
+    @IsString()
+    @Matches(/^\d{11}$/)
+    phone?: string;
 }

@@ -471,22 +471,16 @@ export default function Home() {
         body: { email: updatedEmail },
       });
 
-      const post = await check(
-        'Create published post',
-        'POST',
-        '/api/posts',
-        201,
-        {
-          auth: true,
-          body: {
-            title: `Web API test ${runId}`,
-            content: 'Created by the DreamCMS one-click API test.',
-            summary: 'Browser API test',
-            status: 'published',
-            tags: ['APITest', 'DreamCMS'],
-          },
+      const post = await check('Create draft post', 'POST', '/api/posts', 201, {
+        auth: true,
+        body: {
+          title: `Web API test ${runId}`,
+          content: 'Created by the DreamCMS one-click API test.',
+          summary: 'Browser API test',
+          status: 'draft',
+          tags: ['APITest', 'DreamCMS'],
         },
-      );
+      });
       if (
         post?.response.ok &&
         typeof post.payload === 'object' &&
@@ -498,8 +492,99 @@ export default function Home() {
       }
 
       if (publicId) {
+        const publish = await check(
+          'Publish draft post',
+          'PATCH',
+          `/api/posts/${publicId}`,
+          200,
+          { auth: true, body: { status: 'published' } },
+        );
+        const firstPublishedAt =
+          publish?.response.ok &&
+          typeof publish.payload === 'object' &&
+          publish.payload
+            ? ((publish.payload as { data?: { publishedAt?: string | null } })
+                .data?.publishedAt ?? null)
+            : null;
+        addResult({
+          name: 'draft → published sets publishedAt',
+          method: 'PATCH',
+          path: `/api/posts/${publicId}`,
+          passed: Boolean(firstPublishedAt),
+          detail: firstPublishedAt
+            ? `publishedAt was set to ${firstPublishedAt}`
+            : 'publishedAt should be a timestamp after publishing',
+          responseBody: firstPublishedAt ?? 'null',
+        });
+
+        const unpublish = await check(
+          'Return published post to draft',
+          'PATCH',
+          `/api/posts/${publicId}`,
+          200,
+          { auth: true, body: { status: 'draft' } },
+        );
+        const draftPublishedAt =
+          unpublish?.response.ok &&
+          typeof unpublish.payload === 'object' &&
+          unpublish.payload
+            ? (unpublish.payload as { data?: { publishedAt?: string | null } })
+                .data?.publishedAt
+            : undefined;
+        addResult({
+          name: 'published → draft clears publishedAt',
+          method: 'PATCH',
+          path: `/api/posts/${publicId}`,
+          passed: draftPublishedAt === null,
+          detail:
+            draftPublishedAt === null
+              ? 'publishedAt was cleared'
+              : 'publishedAt should be null after returning to draft',
+          responseBody: JSON.stringify(
+            { publishedAt: draftPublishedAt },
+            null,
+            2,
+          ),
+        });
+
+        const republish = await check(
+          'Publish draft post again',
+          'PATCH',
+          `/api/posts/${publicId}`,
+          200,
+          { auth: true, body: { status: 'published' } },
+        );
+        const restoredPublishedAt =
+          republish?.response.ok &&
+          typeof republish.payload === 'object' &&
+          republish.payload
+            ? ((
+                republish.payload as {
+                  data?: { publishedAt?: string | null };
+                }
+              ).data?.publishedAt ?? null)
+            : null;
+        addResult({
+          name: 'Republishing sets publishedAt again',
+          method: 'PATCH',
+          path: `/api/posts/${publicId}`,
+          passed:
+            Boolean(restoredPublishedAt) &&
+            (!firstPublishedAt ||
+              new Date(restoredPublishedAt!).getTime() >=
+                new Date(firstPublishedAt).getTime()),
+          detail: restoredPublishedAt
+            ? `publishedAt was set to ${restoredPublishedAt}`
+            : 'publishedAt should be set after republishing',
+          responseBody: JSON.stringify(
+            { firstPublishedAt, republishedAt: restoredPublishedAt },
+            null,
+            2,
+          ),
+        });
+
         const update = await check(
-          'Update post fields and publish',
+          'Update published post fields',
           'PATCH',
           `/api/posts/${publicId}`,
           200,
@@ -608,6 +693,43 @@ export default function Home() {
           200,
           { auth: true },
         );
+        const restoredPost = await check(
+          'Read restored post',
+          'GET',
+          `/api/posts/get/${publicId}`,
+          200,
+          { auth: true },
+        );
+        const publishedAtAfterRestore =
+          restoredPost?.response.ok &&
+          typeof restoredPost.payload === 'object' &&
+          restoredPost.payload
+            ? ((
+                restoredPost.payload as {
+                  data?: { publishedAt?: string | null };
+                }
+              ).data?.publishedAt ?? null)
+            : null;
+        addResult({
+          name: 'Restore preserves publishedAt',
+          method: 'GET',
+          path: `/api/posts/get/${publicId}`,
+          passed:
+            Boolean(restoredPublishedAt) &&
+            publishedAtAfterRestore === restoredPublishedAt,
+          detail:
+            publishedAtAfterRestore === restoredPublishedAt
+              ? 'publishedAt was preserved after trash and restore'
+              : 'publishedAt changed while the post was in the trash',
+          responseBody: JSON.stringify(
+            {
+              beforeTrash: restoredPublishedAt,
+              afterRestore: publishedAtAfterRestore,
+            },
+            null,
+            2,
+          ),
+        });
         await check(
           'Reject permanent delete after restore',
           'DELETE',

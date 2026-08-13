@@ -1,4 +1,9 @@
-import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
+import {
+  MiddlewareConsumer,
+  Module,
+  NestModule,
+  RequestMethod,
+} from '@nestjs/common';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { PrismaModule } from './prisma/prisma.module.js';
@@ -35,14 +40,16 @@ function validateEnvironment(config: Record<string, unknown>) {
         ttl: 60_000,
         limit: 10,
       },
-    ])
-
+    ]),
   ],
   controllers: [AppController],
   providers: [AppService],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer.apply(RequestLoggerMiddleware).forRoutes('/api/{*path}');
+    consumer.apply(RequestLoggerMiddleware).forRoutes({
+      path: '{*path}',
+      method: RequestMethod.ALL,
+    });
   }
 }

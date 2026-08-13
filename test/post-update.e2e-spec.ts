@@ -345,6 +345,48 @@ describe('Post update security and workflow (e2e)', () => {
     expect(response.body.data.publishedAt).toBeNull();
   });
 
+  it('preserves the correct publishedAt through trash and restore', async () => {
+    await request(app.getHttpServer())
+      .delete(`/api/posts/${ownPublicId}`)
+      .set('Authorization', `Bearer ${editorToken}`)
+      .expect(200);
+    await request(app.getHttpServer())
+      .patch(`/api/posts/${ownPublicId}/restore`)
+      .set('Authorization', `Bearer ${editorToken}`)
+      .expect(200);
+
+    const restoredDraft = await request(app.getHttpServer())
+      .get(`/api/posts/get/${ownPublicId}`)
+      .set('Authorization', `Bearer ${editorToken}`)
+      .expect(200);
+    expect(restoredDraft.body.data.status).toBe('draft');
+    expect(restoredDraft.body.data.publishedAt).toBeNull();
+
+    const republished = await request(app.getHttpServer())
+      .patch(`/api/posts/${ownPublicId}`)
+      .set('Authorization', `Bearer ${editorToken}`)
+      .send({ status: 'published' })
+      .expect(200);
+    const publishedAt = republished.body.data.publishedAt;
+    expect(publishedAt).not.toBeNull();
+
+    await request(app.getHttpServer())
+      .delete(`/api/posts/${ownPublicId}`)
+      .set('Authorization', `Bearer ${editorToken}`)
+      .expect(200);
+    await request(app.getHttpServer())
+      .patch(`/api/posts/${ownPublicId}/restore`)
+      .set('Authorization', `Bearer ${editorToken}`)
+      .expect(200);
+
+    const restoredPublished = await request(app.getHttpServer())
+      .get(`/api/posts/get/${ownPublicId}`)
+      .set('Authorization', `Bearer ${editorToken}`)
+      .expect(200);
+    expect(restoredPublished.body.data.status).toBe('published');
+    expect(restoredPublished.body.data.publishedAt).toBe(publishedAt);
+  });
+
   it('requires authentication and rejects regular users', async () => {
     await request(app.getHttpServer())
       .patch(`/api/posts/${ownPublicId}`)

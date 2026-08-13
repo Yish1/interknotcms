@@ -241,7 +241,7 @@ describe('Post update security and workflow (e2e)', () => {
     expect(links).toBe(1);
     await expect(
       prisma.tag.findUnique({ where: { name: tagNames[0] } }),
-    ).resolves.toBeNull();
+    ).resolves.not.toBeNull();
     await expect(
       prisma.tag.findUnique({ where: { name: sharedTag } }),
     ).resolves.not.toBeNull();
@@ -271,6 +271,26 @@ describe('Post update security and workflow (e2e)', () => {
       .set('Authorization', `Bearer ${editorToken}`)
       .send({ authorId: otherEditorId })
       .expect(403);
+  });
+
+  it('rejects lowercase 0d because it is reserved for publicId', async () => {
+    const response = await request(app.getHttpServer())
+      .post(`/api/posts/${ownPublicId}/alias`)
+      .set('Authorization', `Bearer ${editorToken}`)
+      .send({ alias: '0d-custom-alias' })
+      .expect(400);
+
+    expect(response.body.message).toContain('Alias cannot start with 0d');
+  });
+
+  it('treats alias prefixes as case-sensitive and allows 0D', async () => {
+    const response = await request(app.getHttpServer())
+      .post(`/api/posts/${ownPublicId}/alias`)
+      .set('Authorization', `Bearer ${editorToken}`)
+      .send({ alias: `0D-custom-${runId}` })
+      .expect(201);
+
+    expect(response.body.data.alias).toBe(`0D-custom-${runId}`);
   });
 
   it('allows an admin to update any post and transfer its author', async () => {
@@ -433,6 +453,27 @@ describe('Post update security and workflow (e2e)', () => {
     });
     await expect(
       prisma.tag.findUnique({ where: { name: permanentTag } }),
-    ).resolves.toBeNull();
+    ).resolves.not.toBeNull();
+  });
+
+  it('refuses to permanently delete a post before it enters trash', async () => {
+    const response = await request(app.getHttpServer())
+      .delete(`/api/posts/${ownPublicId}/permanent`)
+      .set('Authorization', `Bearer ${editorToken}`)
+      .expect(404);
+
+    expect(response.body.message).toBe(
+      'Post not found or page need add into trashbin first',
+    );
+
+    const remainingPost = await prisma.post.findUnique({
+      where: { publicId: ownPublicId },
+      select: { publicId: true, deletedAt: true },
+    });
+
+    expect(remainingPost).toEqual({
+      publicId: ownPublicId,
+      deletedAt: null,
+    });
   });
 });

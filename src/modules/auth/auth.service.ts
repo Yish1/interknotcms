@@ -42,16 +42,27 @@ export class AuthService {
       throw new UnauthorizedException('Invalid username or password');
     }
 
-    await this.prisma.user.update({
+    const profile = await this.prisma.user.update({
       where: {
         id: user.id,
       },
       data: {
         lastLoginAt: new Date(),
       },
+      select: {
+        id: true,
+        username: true,
+        email: true,
+        phone: true,
+        avatar: true,
+        role: true,
+        isActive: true,
+        emailVerifiedAt: true,
+        phoneVerifiedAt: true,
+        lastLoginAt: true,
+        createdAt: true,
+      },
     });
-
-    const { passwordHash, authVersion, deletedAt, ...userWithoutPassword } = user;
 
     const payload = {
       sub: user.id,
@@ -62,7 +73,7 @@ export class AuthService {
     const accessToken = await this.jwtService.signAsync(payload);
 
     return {
-      user: userWithoutPassword,
+      user: profile,
       accessToken,
     };
   }

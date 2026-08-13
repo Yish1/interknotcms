@@ -37,7 +37,7 @@ const endpoints: Endpoint[] = [
   { group: "Posts", method: "GET", path: "/api/posts/tag/DreamCMS?page=1&pageSize=10&sort=latest", name: "List posts by tag", access: "Public · published posts only" },
   { group: "Posts", method: "GET", path: "/api/posts/get/:identifier", name: "Get post", auth: "optional", access: "Optional token · published public · draft author/admin" },
   { group: "Posts", method: "PATCH", path: "/api/posts/:identifier", name: "Update post", auth: "required", access: "Owner editor or admin · authorId admin only", body: { title: "Updated title", summary: "Updated summary", status: "published", tags: ["DreamCMS", "Updated"] } },
-  { group: "Posts", method: "POST", path: "/api/posts/:identifier/alias", name: "Create alias", auth: "required", access: "Author or admin", body: { alias: "hello-dreamcms" } },
+  { group: "Posts", method: "POST", path: "/api/posts/:identifier/alias", name: "Create alias", auth: "required", access: "Author or admin · alias cannot start with 0d", body: { alias: "hello-dreamcms" } },
   { group: "Posts", method: "DELETE", path: "/api/posts/:identifier", name: "Trash post", auth: "required", access: "Owner editor or admin" },
   { group: "Posts", method: "PATCH", path: "/api/posts/:identifier/restore", name: "Restore post", auth: "required", access: "Owner editor or admin" },
   { group: "Posts", method: "DELETE", path: "/api/posts/:identifier/permanent", name: "Delete post permanently", auth: "required", access: "Owner editor or admin · irreversible" },

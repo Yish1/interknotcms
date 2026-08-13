@@ -32,19 +32,6 @@ export class PostsService {
     });
   }
 
-  private async cleanupOrphanTags(tagIds: number[]): Promise<void> {
-    if (tagIds.length === 0) {
-      return;
-    }
-
-    await this.prisma.tag.deleteMany({
-      where: {
-        id: { in: tagIds },
-        posts: { none: {} },
-      },
-    });
-  }
-
   private generatePublicId(): string {
     const chars = '0oO';
     const bytes = randomBytes(13); // 159万种组合任君选择
@@ -520,6 +507,7 @@ export class PostsService {
 
     const post = await this.prisma.post.findFirst({
       where: {
+        deletedAt: { not: null },
         OR: [
           { publicId: identifier },
           { aliases: { some: { alias: identifier } } },
@@ -531,14 +519,13 @@ export class PostsService {
         authorId: true,
         publicId: true,
         title: true,
-        tags: {
-          select: { tagId: true },
-        },
       },
     });
 
     if (!post) {
-      throw new NotFoundException('Post not found');
+      throw new NotFoundException(
+        'Post not found or page need add into trashbin first',
+      );
     }
 
     if (currentUser.role == 'editor' && post.authorId !== currentUser.sub) {
@@ -548,8 +535,6 @@ export class PostsService {
     await this.prisma.post.delete({
       where: { id: post.id },
     });
-
-    await this.cleanupOrphanTags(post.tags.map((item) => item.tagId));
 
     return {
       publicId: post.publicId,
@@ -626,9 +611,6 @@ export class PostsService {
         authorId: true,
         status: true,
         publishedAt: true,
-        tags: {
-          select: { tagId: true },
-        },
       },
     });
 
@@ -729,10 +711,6 @@ export class PostsService {
         },
       },
     });
-
-    if (uniqueTags !== undefined) {
-      await this.cleanupOrphanTags(post.tags.map((item) => item.tagId));
-    }
 
     return {
       ...updatedPost,

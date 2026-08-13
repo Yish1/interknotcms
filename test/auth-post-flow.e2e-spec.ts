@@ -95,7 +95,27 @@ describe('Authentication and post publishing flow (e2e)', () => {
 
     expect(response.body.message).toBe('Login successful');
     expect(response.body.data.user.username).toBe(username);
+    expect(Object.keys(response.body.data.user).sort()).toEqual(
+      [
+        'avatar',
+        'createdAt',
+        'email',
+        'emailVerifiedAt',
+        'id',
+        'isActive',
+        'lastLoginAt',
+        'phone',
+        'phoneVerifiedAt',
+        'role',
+        'username',
+      ].sort(),
+    );
+    expect(response.body.data.user.email).toBe(email);
+    expect(response.body.data.user.isActive).toBe(true);
+    expect(response.body.data.user.lastLoginAt).not.toBeNull();
     expect(response.body.data.user.passwordHash).toBeUndefined();
+    expect(response.body.data.user.authVersion).toBeUndefined();
+    expect(response.body.data.user.deletedAt).toBeUndefined();
     expect(response.body.data.accessToken).toEqual(expect.any(String));
 
     originalAccessToken = response.body.data.accessToken;

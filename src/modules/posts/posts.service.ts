@@ -282,7 +282,13 @@ export class PostsService {
     };
   }
 
-  async listManagePosts(query: ManagePostQueryDto, currentUser: { sub: string; role: string, username: string }) {
+  async listManagePosts(
+    query: ManagePostQueryDto, 
+    currentUser: { sub: string; role: string, username: string,
+    }) 
+
+    {
+
     if (currentUser.role !== 'admin' && currentUser.role !== 'editor') {
       throw new ForbiddenException('Permission denied');
     }
@@ -360,5 +366,95 @@ export class PostsService {
     };
   }
 
+  async listPostsByTag(
+    tag: string,
+    query: PostListQueryDto,
+  ) {
+    const {
+      page,
+      pageSize,
+      sort,
+    } = query;
+
+    const skip = (page - 1) * pageSize;
+
+    const orderBy =
+      sort === 'views'
+        ? {
+            viewCount: 'desc' as const,
+          }
+        : {
+            publishedAt: 'desc' as const,
+          };
+
+    const where: Prisma.PostWhereInput = {
+      status: 'published',
+      deletedAt: null,
+
+      tags: {
+        some: {
+          tag: {
+            name: tag,
+          },
+        },
+      },
+    };
+
+    const [posts, total] = await Promise.all([
+      this.prisma.post.findMany({
+        where,
+        skip,
+        take: pageSize,
+        orderBy,
+
+        select: {
+          publicId: true,
+          title: true,
+          summary: true,
+          viewCount: true,
+          publishedAt: true,
+
+          author: {
+            select: {
+              username: true,
+              avatar: true,
+            },
+          },
+
+          tags: {
+            select: {
+              tag: {
+                select: {
+                  name: true,
+                },
+              },
+            },
+          },
+        },
+      }),
+
+      this.prisma.post.count({
+        where,
+      }),
+    ]);
+
+    return {
+      posts: posts.map((post) => ({
+        ...post,
+        tags: post.tags.map(
+          (item) => item.tag.name,
+        ),
+      })),
+
+      pagination: {
+        page,
+        pageSize,
+        total,
+        totalPages: Math.ceil(
+          total / pageSize,
+        ),
+      },
+    };
+  }
 
 }

@@ -79,4 +79,19 @@ export class PostsController {
       pagination: result.pagination,
     };
   }
+
+  @Get('tag/:tag') // api/posts/tag/:tag?page=x&pageSize=xx&sort=latest or views
+  async listPostsByTag(
+    @Param('tag') tag: string,
+    @Query() query: PostListQueryDto,
+  ) {
+    const posts = await this.postsService.listPostsByTag(tag, query);
+    return {
+      message: 'Posts by tag retrieved successfully',
+      data: posts,
+      pagination: posts.pagination,
+    };
+  }
+
+
 }

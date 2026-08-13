@@ -34,8 +34,13 @@ const endpoints: Endpoint[] = [
   { group: "Posts", method: "POST", path: "/api/posts", name: "Create post", auth: "required", access: "Editor or admin", body: { title: "DreamCMS test post", content: "# Hello DreamCMS\nAPI Console generated content.", summary: "API test", status: "draft", tags: ["NestJS", "DreamCMS"] } },
   { group: "Posts", method: "GET", path: "/api/posts?page=1&pageSize=10&sort=latest", name: "List public posts", access: "Public · published posts only" },
   { group: "Posts", method: "GET", path: "/api/posts/manage?page=1&pageSize=10", name: "Manage posts", auth: "required", access: "Admin or editor · supports status filtering" },
+  { group: "Posts", method: "GET", path: "/api/posts/tag/DreamCMS?page=1&pageSize=10&sort=latest", name: "List posts by tag", access: "Public · published posts only" },
   { group: "Posts", method: "GET", path: "/api/posts/get/:identifier", name: "Get post", auth: "optional", access: "Optional token · published public · draft author/admin" },
+  { group: "Posts", method: "PATCH", path: "/api/posts/:identifier", name: "Update post", auth: "required", access: "Owner editor or admin · authorId admin only", body: { title: "Updated title", summary: "Updated summary", status: "published", tags: ["DreamCMS", "Updated"] } },
   { group: "Posts", method: "POST", path: "/api/posts/:identifier/alias", name: "Create alias", auth: "required", access: "Author or admin", body: { alias: "hello-dreamcms" } },
+  { group: "Posts", method: "DELETE", path: "/api/posts/:identifier", name: "Trash post", auth: "required", access: "Owner editor or admin" },
+  { group: "Posts", method: "PATCH", path: "/api/posts/:identifier/restore", name: "Restore post", auth: "required", access: "Owner editor or admin" },
+  { group: "Posts", method: "DELETE", path: "/api/posts/:identifier/permanent", name: "Delete post permanently", auth: "required", access: "Owner editor or admin · irreversible" },
 ];
 
 const groups = ["System", "Auth", "Users", "Posts"];
@@ -209,12 +214,31 @@ export default function Home() {
       }
 
       if (publicId) {
+        const update = await check("Update post fields and publish", "PATCH", `/api/posts/${publicId}`, 200, {
+          auth: true,
+          body: {
+            title: `Web API updated ${runId}`,
+            summary: "Updated by the one-click API test",
+            status: "published",
+            tags: ["api-test-updated", "api-test-updated", "DreamCMS"],
+          },
+        });
+        if (update?.response.ok && typeof update.payload === "object" && update.payload) {
+          const data = (update.payload as { data?: { publishedAt?: string | null; tags?: string[] } }).data;
+          if (!data?.publishedAt || data.tags?.filter((item) => item === "api-test-updated").length !== 1) {
+            addResult({ name: "Validate update response", method: "PATCH", path: `/api/posts/${publicId}`, passed: false, detail: "publishedAt was not set or duplicate tags were not removed." });
+          }
+        }
         await check("Get post with token", "GET", `/api/posts/get/${publicId}`, 200, { auth: true });
         await check("Create post alias", "POST", `/api/posts/${publicId}/alias`, 201, {
           auth: true,
           body: { alias },
         });
         await check("Get published post as guest", "GET", `/api/posts/get/${alias}`, 200);
+        await check("List posts by tag", "GET", "/api/posts/tag/DreamCMS?page=1&pageSize=5&sort=latest", 200);
+        await check("Trash test post", "DELETE", `/api/posts/${publicId}`, 200, { auth: true });
+        await check("Restore test post", "PATCH", `/api/posts/${publicId}/restore`, 200, { auth: true });
+        await check("Delete test post permanently", "DELETE", `/api/posts/${publicId}/permanent`, 200, { auth: true });
       } else {
         addResult({ name: "Post read and alias tests", method: "—", path: "/api/posts/get/:identifier", passed: false, detail: "Post creation did not return a publicId; dependent tests were skipped." });
       }
@@ -269,7 +293,7 @@ export default function Home() {
 
           <section className="test-suite">
             <div className="suite-heading"><div><span>Automated suite</span><h2>Test all APIs</h2></div><strong>{testResults.filter((item) => item.passed).length}/{testResults.length || endpoints.length}</strong></div>
-            <p>Runs the complete API flow against the development database. A temporary user is deleted afterward; the uniquely named published test post remains.</p>
+            <p>Runs the complete API flow against the development database. Temporary users and posts are permanently removed afterward.</p>
             <div className="test-credentials">
               <input value={testUsername} onChange={(event) => setTestUsername(event.target.value)} placeholder="Admin username" autoComplete="username" />
               <input type="password" value={testPassword} onChange={(event) => setTestPassword(event.target.value)} placeholder="Admin password" autoComplete="current-password" />

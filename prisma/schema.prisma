@@ -87,7 +87,7 @@ enum PostStatus {
 
 model Tag {
   id    Int       @id @default(autoincrement())
-  name  String    @unique @db.VarChar(50)
+  name  String    @unique @db.VarChar(100)
   posts PostTag[]
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)

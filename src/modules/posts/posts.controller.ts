@@ -7,6 +7,8 @@ import {
   Req,
   UseGuards,
   Query,
+  Delete,
+  Patch,
 } from '@nestjs/common';
 import { PostsService } from './posts.service.js';
 import { CreatePostDto } from './dto/create-post.dto.js';
@@ -15,6 +17,7 @@ import { OptionalAuthGuard } from '../auth/optional-auth.guard.js';
 import { CreatePostAliasDto } from './dto/create-post-alias.dto.js';
 import { PostListQueryDto } from './dto/post-list-query.dto.js';
 import { ManagePostQueryDto } from './dto/post-list-query-manage.dto.js';
+import { UpdatePostDto } from './dto/update-post.dto.js';
 
 @Controller('posts')
 export class PostsController {
@@ -69,7 +72,7 @@ export class PostsController {
   }
 
   @UseGuards(AuthGuard)
-  @Get('manage') // 
+  @Get('manage') //
   async listManagePosts(@Req() req: any, @Query() query: ManagePostQueryDto) {
     const result = await this.postsService.listManagePosts(query, req.user);
 
@@ -93,5 +96,57 @@ export class PostsController {
     };
   }
 
+  @UseGuards(AuthGuard)
+  @Delete(':identifier')
+  async deletePost(@Param('identifier') identifier: string, @Req() req: any) {
+    const post = await this.postsService.deletePost(identifier, req.user);
+    return {
+      message: 'Post deleted successfully',
+      data: post,
+    };
+  }
 
+  @UseGuards(AuthGuard)
+  @Patch(':identifier/restore')
+  async restorePost(@Param('identifier') identifier: string, @Req() req: any) {
+    const post = await this.postsService.restorePost(identifier, req.user);
+    return {
+      message: 'Post restored successfully',
+      data: post,
+    };
+  }
+
+  @UseGuards(AuthGuard)
+  @Delete(':identifier/permanent')
+  async deletePostPermanently(
+    @Param('identifier') identifier: string,
+    @Req() req: any,
+  ) {
+    const post = await this.postsService.deletePostParmanently(
+      identifier,
+      req.user,
+    );
+    return {
+      message: 'Post permanently deleted successfully',
+      data: post,
+    };
+  }
+
+  @UseGuards(AuthGuard)
+  @Patch(':identifier')
+  async updatePost(
+    @Param('identifier') identifier: string,
+    @Body() updatePostDto: UpdatePostDto,
+    @Req() req: any,
+  ) {
+    const post = await this.postsService.updatePost(
+      identifier,
+      updatePostDto,
+      req.user,
+    );
+    return {
+      message: 'Post updated successfully',
+      data: post,
+    };
+  }
 }

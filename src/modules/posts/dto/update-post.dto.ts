@@ -5,33 +5,31 @@ import {
   IsOptional,
   IsString,
   IsUUID,
-  Matches,
   MaxLength,
   MinLength,
 } from 'class-validator';
 
-export class CreatePostDto {
+export class UpdatePostDto {
+  @IsOptional()
   @IsString()
   @MinLength(1)
   @MaxLength(100)
-  title!: string;
+  title?: string;
 
+  @IsOptional()
   @IsString()
   @MinLength(1)
   @MaxLength(50000)
-  content!: string;
+  content?: string;
 
   @IsOptional()
   @IsString()
-  @MaxLength(100)
+  @MaxLength(500)
   summary?: string;
 
+  @IsOptional()
   @IsIn(['draft', 'published'])
   status?: 'draft' | 'published';
-
-  @IsOptional()
-  @IsUUID()
-  authorId?: string;
 
   @IsOptional()
   @IsArray()
@@ -39,4 +37,8 @@ export class CreatePostDto {
   @IsString({ each: true })
   @MaxLength(100, { each: true })
   tags?: string[];
+
+  @IsOptional()
+  @IsUUID()
+  authorId?: string;
 }

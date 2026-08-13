@@ -204,4 +204,17 @@ describe('Authentication and post publishing flow (e2e)', () => {
     expect(response.body.data.status).toBe('published');
     expect(response.body.data.publishedAt).not.toBeNull();
   });
+
+  it('rejects creating a post with more than 8 tags', async () => {
+    await request(app.getHttpServer())
+      .post('/api/posts')
+      .set('Authorization', `Bearer ${renewedAccessToken}`)
+      .send({
+        title: 'Too many tags',
+        content: 'This request must be rejected before reaching Prisma.',
+        status: 'draft',
+        tags: Array.from({ length: 9 }, (_, index) => `tag-${index}`),
+      })
+      .expect(400);
+  });
 });

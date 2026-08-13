@@ -18,7 +18,7 @@ export class AuthGuard implements CanActivate {
     );
 
     if (!token) {
-      throw new UnauthorizedException('Token not found');
+      throw new UnauthorizedException('Permission denied');
     }
 
     request.user = await this.accessTokenService.authenticate(token);

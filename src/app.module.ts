@@ -7,6 +7,8 @@ import { UsersModule } from './modules/users/users.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { PostsModule } from './modules/posts/posts.module.js';
 import { RequestLoggerMiddleware } from './common/middleware/request-logger.middleware.js';
+// import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 
 function validateEnvironment(config: Record<string, unknown>) {
   const registrationMode = config.REGISTRATION_MODE;
@@ -28,6 +30,13 @@ function validateEnvironment(config: Record<string, unknown>) {
     UsersModule,
     AuthModule,
     PostsModule,
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60_000,
+        limit: 10,
+      },
+    ])
+
   ],
   controllers: [AppController],
   providers: [AppService],

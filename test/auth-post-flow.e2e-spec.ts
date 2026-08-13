@@ -327,4 +327,16 @@ describe('Authentication and post publishing flow (e2e)', () => {
       })
       .expect(400);
   });
+
+  it('logs out and invalidates the current token', async () => {
+    await request(app.getHttpServer())
+      .post('/api/auth/logout')
+      .set('Authorization', `Bearer ${renewedAccessToken}`)
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${renewedAccessToken}`)
+      .expect(401);
+  });
 });

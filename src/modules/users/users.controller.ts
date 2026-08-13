@@ -4,6 +4,8 @@ import { CreateUserDto } from './dto/create-user.dto.js';
 import { UpdateUserDto } from './dto/update-user.dto.js';
 import { AuthGuard } from '../auth/auth.guard.js';
 import { OptionalAuthGuard } from '../auth/optional-auth.guard.js';
+import { Throttle } from '@nestjs/throttler';
+import { LogThrottlerGuard } from '../../common/guards/log-throttler.guard.js';
 
 @Controller('users')
 export class UsersController {
@@ -20,7 +22,8 @@ export class UsersController {
     }
 
     @Get(':username')
-    @UseGuards(AuthGuard)
+    @UseGuards(AuthGuard, LogThrottlerGuard)
+    @Throttle({default: {limit: 5, ttl: 60_000}})
     async findOne(@Param('username') username: string, @Req() req: any) {
         const user = await this.usersService.findOne(username, req.user);
         return {

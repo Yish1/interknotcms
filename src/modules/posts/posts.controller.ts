@@ -18,12 +18,15 @@ import { CreatePostAliasDto } from './dto/create-post-alias.dto.js';
 import { PostListQueryDto } from './dto/post-list-query.dto.js';
 import { ManagePostQueryDto } from './dto/post-list-query-manage.dto.js';
 import { UpdatePostDto } from './dto/update-post.dto.js';
+import { Throttle } from '@nestjs/throttler';
+import { LogThrottlerGuard } from '../../common/guards/log-throttler.guard.js';
 
 @Controller('posts')
 export class PostsController {
   constructor(private readonly postsService: PostsService) {}
 
-  @UseGuards(AuthGuard)
+  @UseGuards(AuthGuard, LogThrottlerGuard)
+  @Throttle({default: {limit: 5, ttl: 60_000}})
   @Post()
   async create(@Body() createPostDto: CreatePostDto, @Req() req: any) {
     const post = await this.postsService.createPost(createPostDto, req.user);
@@ -43,7 +46,8 @@ export class PostsController {
     };
   }
 
-  @UseGuards(AuthGuard)
+  @UseGuards(AuthGuard, LogThrottlerGuard)
+  @Throttle({default: {limit: 5, ttl: 60_000}})
   @Post(':identifier/alias')
   async createPostAlias(
     @Param('identifier') identifier: string,
@@ -147,6 +151,60 @@ export class PostsController {
     return {
       message: 'Post updated successfully',
       data: post,
+    };
+  }
+
+  @UseGuards(AuthGuard)
+  @Delete(':identifier/alias/:alias')
+  async deletePostAlias(
+    @Param('identifier') identifier: string,
+    @Param('alias') alias: string,
+    @Req() req: any,
+  ) {
+    const post = await this.postsService.deletePostAlias(
+      identifier,
+      alias,
+      req.user,
+    );
+    return {
+      message: 'Post alias deleted successfully',
+      data: post,
+    };
+  }
+
+  @UseGuards(AuthGuard)
+  @Patch(':identifier/alias/:oldAlias/rename/:newAlias')
+  async renamePostAlias(
+    @Param('identifier') identifier: string,
+    @Param('oldAlias') oldAlias: string,
+    @Param('newAlias') newAlias: string,
+    @Req() req: any,
+  ) {
+    const post = await this.postsService.renamePostAlias(
+      identifier,
+      oldAlias,
+      newAlias,
+      req.user,
+    );
+    return {
+      message: 'Post alias renamed successfully',
+      data: post,
+    };
+  }
+
+  @UseGuards(AuthGuard)
+  @Get(':identifier/aliases')
+  async listPostAliases(
+    @Param('identifier') identifier: string,
+    @Req() req: any,
+  ) {
+    const aliases = await this.postsService.listPostAliases(
+      identifier,
+      req.user,
+    );
+    return {
+      message: 'Post aliases retrieved successfully',
+      data: aliases,
     };
   }
 }

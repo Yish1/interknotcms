@@ -717,4 +717,152 @@ export class PostsService {
       tags: updatedPost.tags.map((item) => item.tag.name),
     };
   }
+
+  async deletePostAlias(
+    identifier: string,
+    alias: string,
+    currentUser: { sub: string; role: string },
+  ) {
+
+    if (currentUser.role !== 'admin' && currentUser.role !== 'editor') {
+      throw new ForbiddenException('Permission denied');
+    }
+
+    const post = await this.prisma.post.findFirst({
+      where: {
+        deletedAt: null,
+        OR: [
+          { publicId: identifier },
+          { aliases: { some: { alias: identifier } } },
+        ],
+      },
+      select: {
+        id: true,
+        authorId: true,
+      },
+    });
+
+    if (!post) {
+      throw new NotFoundException('Post not found');
+    }
+
+    if (currentUser.role !== 'admin' && post.authorId !== currentUser.sub) {
+      throw new ForbiddenException('Permission denied');
+    }
+
+    const postAlias = await this.prisma.postAlias.findFirst({
+      where: {
+        postId: post.id,
+        alias,
+      },
+    });
+
+    if (!postAlias) {
+      throw new NotFoundException('Alias not found');
+    }
+
+    return this.prisma.postAlias.delete({
+      where: { id: postAlias.id },
+      select: {
+        alias: true,
+      },
+    });
+  }
+
+  async renamePostAlias(
+    identifier: string,
+    oldAlias: string,
+    newAlias: string,
+    currentUser: { sub: string; role: string },
+  ) {
+    if (currentUser.role !== 'admin' && currentUser.role !== 'editor') {
+      throw new ForbiddenException('Permission denied');
+    }
+
+    if (oldAlias === newAlias) {
+      throw new BadRequestException('New alias must be different from old alias');
+    }
+
+    const post = await this.prisma.post.findFirst({
+      where: {
+        deletedAt: null,
+        OR: [
+          { publicId: identifier },
+          { aliases: { some: { alias: identifier } } },
+        ],
+      },
+      select: { id: true, authorId: true },
+    });
+
+    if (!post) throw new NotFoundException('Post not found');
+
+    if (currentUser.role !== 'admin' && post.authorId !== currentUser.sub) {
+      throw new ForbiddenException('Permission denied');
+    }
+
+    const postAlias = await this.prisma.postAlias.findFirst({
+      where: { postId: post.id, alias: oldAlias },
+      select: { id: true },
+    });
+
+    if (!postAlias) throw new NotFoundException('Old alias not found');
+
+    const existingAlias = await this.prisma.postAlias.findUnique({
+      where: { alias: newAlias },
+    });
+
+    if (existingAlias) {
+      throw new ConflictException('New alias already exists');
+    }
+
+    const publicIdConflict = await this.prisma.post.findUnique({
+      where: { publicId: newAlias },
+    });
+
+    if (publicIdConflict) {
+      throw new ConflictException('New alias conflicts with an existing publicId');
+    }
+
+    return this.prisma.postAlias.update({
+      where: { id: postAlias.id },
+      data: { alias: newAlias },
+      select: { alias: true },
+    });
+  }
+
+  async listPostAliases(
+    identifier: string,
+    currentUser: { sub: string; role: string },
+  ){
+
+    if (currentUser.role !== 'admin' && currentUser.role !== 'editor') {
+      throw new ForbiddenException('Permission denied');
+    }
+
+    const post = await this.prisma.post.findFirst({
+      where: {
+        deletedAt: null,
+        OR: [
+          { publicId: identifier },
+          { aliases: { some: { alias: identifier } } },
+        ],
+      },
+      select: {
+        id: true,
+        authorId: true,
+        aliases: {
+          select: {
+            alias: true,
+          },
+        },
+      },
+    });
+
+    if (!post) throw new NotFoundException('Post not found');
+
+    return post.aliases.map((a) => a.alias);
+
+  }
+
+
 }

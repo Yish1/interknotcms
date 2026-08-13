@@ -517,6 +517,15 @@ export class PostsService {
 
   }
 
+  async listAllTags() {
+    const tags = await this.prisma.tag.findMany({
+      select: { name: true },
+      orderBy: { name: 'asc' },
+    });
+
+    return tags.map((tag) => tag.name);
+  }
+
   async deletePost(
     identifier: string,
     currentUser: {

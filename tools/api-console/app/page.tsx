@@ -130,6 +130,22 @@ const endpoints: Endpoint[] = [
   },
   {
     group: 'Posts',
+    method: 'PATCH',
+    path: '/api/posts/tag/:oldTag/rename/:newTag',
+    name: 'Rename tag',
+    auth: 'required',
+    access: 'Admin only',
+  },
+  {
+    group: 'Posts',
+    method: 'DELETE',
+    path: '/api/posts/tag/:tag',
+    name: 'Delete tag',
+    auth: 'required',
+    access: 'Admin only',
+  },
+  {
+    group: 'Posts',
     method: 'GET',
     path: '/api/posts/manage?page=1&pageSize=10',
     name: 'Manage posts',
@@ -346,6 +362,8 @@ export default function Home() {
     const updatedEmail = `${username}_new@example.com`;
     const alias = `web-test-${runId}`;
     const renamedAlias = `web-renamed-${runId}`;
+    const tagName = `WebTag${runId}`;
+    const renamedTag = `WebRenamedTag${runId}`;
     let adminToken = '';
     let publicId = '';
 
@@ -478,7 +496,7 @@ export default function Home() {
           content: 'Created by the DreamCMS one-click API test.',
           summary: 'Browser API test',
           status: 'draft',
-          tags: ['APITest', 'DreamCMS'],
+          tags: [tagName, 'DreamCMS'],
         },
       });
       if (
@@ -581,6 +599,81 @@ export default function Home() {
             null,
             2,
           ),
+        });
+
+        await check(
+          'List posts by new test tag',
+          'GET',
+          `/api/posts/tag/${encodeURIComponent(tagName)}?page=1&pageSize=5&sort=latest`,
+          200,
+        );
+        await check(
+          'Rename tag',
+          'PATCH',
+          `/api/posts/tag/${encodeURIComponent(tagName)}/rename/${encodeURIComponent(renamedTag)}`,
+          200,
+          { auth: true },
+        );
+        const renamedTagPosts = await check(
+          'List posts by renamed tag',
+          'GET',
+          `/api/posts/tag/${encodeURIComponent(renamedTag)}?page=1&pageSize=5&sort=latest`,
+          200,
+        );
+        const renamedTagTotal =
+          renamedTagPosts?.response.ok &&
+          typeof renamedTagPosts.payload === 'object' &&
+          renamedTagPosts.payload
+            ? (
+                renamedTagPosts.payload as {
+                  pagination?: { total?: number };
+                }
+              ).pagination?.total
+            : undefined;
+        addResult({
+          name: 'Renamed tag keeps its post relation',
+          method: 'GET',
+          path: `/api/posts/tag/${renamedTag}`,
+          passed: typeof renamedTagTotal === 'number' && renamedTagTotal >= 1,
+          detail: `Expected at least 1 post, received ${renamedTagTotal ?? 'unknown'}`,
+          responseBody:
+            renamedTagPosts && typeof renamedTagPosts.payload !== 'string'
+              ? JSON.stringify(renamedTagPosts.payload, null, 2)
+              : String(renamedTagPosts?.payload ?? ''),
+        });
+        await check(
+          'Delete renamed tag',
+          'DELETE',
+          `/api/posts/tag/${encodeURIComponent(renamedTag)}`,
+          200,
+          { auth: true },
+        );
+        const deletedTagPosts = await check(
+          'Deleted tag has no posts',
+          'GET',
+          `/api/posts/tag/${encodeURIComponent(renamedTag)}?page=1&pageSize=5&sort=latest`,
+          200,
+        );
+        const deletedTagTotal =
+          deletedTagPosts?.response.ok &&
+          typeof deletedTagPosts.payload === 'object' &&
+          deletedTagPosts.payload
+            ? (
+                deletedTagPosts.payload as {
+                  pagination?: { total?: number };
+                }
+              ).pagination?.total
+            : undefined;
+        addResult({
+          name: 'Deleting tag removes post relations',
+          method: 'GET',
+          path: `/api/posts/tag/${renamedTag}`,
+          passed: deletedTagTotal === 0,
+          detail: `Expected 0 posts, received ${deletedTagTotal ?? 'unknown'}`,
+          responseBody:
+            deletedTagPosts && typeof deletedTagPosts.payload !== 'string'
+              ? JSON.stringify(deletedTagPosts.payload, null, 2)
+              : String(deletedTagPosts?.payload ?? ''),
         });
 
         const update = await check(
@@ -798,6 +891,8 @@ export default function Home() {
     const username = `permission_${runId}`.slice(0, 32);
     const email = `${username}@example.com`;
     const forbiddenAlias = `permission-alias-${runId}`;
+    const permissionTag = `PermissionTag${runId}`;
+    const renamedPermissionTag = `PermissionRenamed${runId}`;
     let adminToken = '';
     let userToken = '';
     let publicId = '';
@@ -926,6 +1021,7 @@ export default function Home() {
             title: `Permission test ${runId}`,
             content: 'Temporary published post for permission checks.',
             status: 'published',
+            tags: [permissionTag],
           },
         },
       );
@@ -962,6 +1058,12 @@ export default function Home() {
         `/api/posts/get/${publicId}`,
         200,
         { token: userToken },
+      );
+      await check(
+        'Guest can list posts by tag',
+        'GET',
+        `/api/posts/tag/${permissionTag}`,
+        200,
       );
 
       const protectedRequests: Array<{
@@ -1023,6 +1125,16 @@ export default function Home() {
           method: 'DELETE',
           path: `/api/posts/${publicId}/permanent`,
         },
+        {
+          name: 'rename tags',
+          method: 'PATCH',
+          path: `/api/posts/tag/${permissionTag}/rename/${renamedPermissionTag}`,
+        },
+        {
+          name: 'delete tags',
+          method: 'DELETE',
+          path: `/api/posts/tag/${permissionTag}`,
+        },
       ];
 
       for (const item of protectedRequests) {
@@ -1034,6 +1146,14 @@ export default function Home() {
           body: item.body,
         });
       }
+
+      await check(
+        'Admin deletes permission test tag',
+        'DELETE',
+        `/api/posts/tag/${permissionTag}`,
+        200,
+        { token: adminToken },
+      );
 
       await check(
         'Delete permission test post',

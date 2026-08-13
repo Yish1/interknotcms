@@ -235,4 +235,13 @@ export class PostsController {
       data: result,
     };
   }
+
+  @Get('tags')
+  async listAllTags() {
+    const tags = await this.postsService.listAllTags();
+    return {
+      message: 'All tags retrieved successfully',
+      data: tags,
+    };
+  }
 }

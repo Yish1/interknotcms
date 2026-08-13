@@ -12,6 +12,7 @@ describe('Guest and user API permissions (e2e)', () => {
   const adminUsername = `permission_admin_${runId}`;
   const userUsername = `permission_user_${runId}`;
   const publicId = `permission-${runId}`;
+  const tagName = `PermissionTag${runId}`;
 
   let app: INestApplication;
   let prisma: PrismaService;
@@ -64,7 +65,6 @@ describe('Guest and user API permissions (e2e)', () => {
       role: user.role,
       authVersion: user.authVersion,
     });
-
     await prisma.post.create({
       data: {
         publicId,
@@ -73,6 +73,11 @@ describe('Guest and user API permissions (e2e)', () => {
         status: 'published',
         publishedAt: new Date(),
         authorId: admin.id,
+        tags: {
+          create: {
+            tag: { create: { name: tagName } },
+          },
+        },
       },
     });
   });
@@ -80,6 +85,7 @@ describe('Guest and user API permissions (e2e)', () => {
   afterAll(async () => {
     if (prisma) {
       await prisma.post.deleteMany({ where: { publicId } });
+      await prisma.tag.deleteMany({ where: { name: tagName } });
       await prisma.user.deleteMany({
         where: { id: { in: [adminId, userId].filter(Boolean) } },
       });
@@ -106,6 +112,8 @@ describe('Guest and user API permissions (e2e)', () => {
       ['DELETE', `/api/posts/${publicId}/permanent`],
       ['DELETE', `/api/posts/${publicId}/alias/missing`],
       ['PATCH', `/api/posts/${publicId}/alias/old/rename/new`],
+      ['PATCH', `/api/posts/tag/${tagName}/rename/Renamed${runId}`],
+      ['DELETE', `/api/posts/tag/${tagName}`],
     ])('cannot call protected endpoint %s %s', async (method, path) => {
       await request(app.getHttpServer())
         [method.toLowerCase() as 'get'](path)
@@ -157,6 +165,8 @@ describe('Guest and user API permissions (e2e)', () => {
       ['DELETE', `/api/posts/${publicId}/permanent`],
       ['DELETE', `/api/posts/${publicId}/alias/missing`],
       ['PATCH', `/api/posts/${publicId}/alias/old/rename/new`],
+      ['PATCH', `/api/posts/tag/${tagName}/rename/Renamed${runId}`],
+      ['DELETE', `/api/posts/tag/${tagName}`],
     ])('is forbidden from privileged endpoint %s %s', async (method, path) => {
       await request(app.getHttpServer())
         [method.toLowerCase() as 'get'](path)

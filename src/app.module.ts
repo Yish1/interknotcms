@@ -8,14 +8,26 @@ import { AuthModule } from './modules/auth/auth.module.js';
 import { PostsModule } from './modules/posts/posts.module.js';
 import { RequestLoggerMiddleware } from './common/middleware/request-logger.middleware.js';
 
+function validateEnvironment(config: Record<string, unknown>) {
+  const registrationMode = config.REGISTRATION_MODE;
+
+  if (registrationMode !== 'OPEN' && registrationMode !== 'ADMIN_ONLY') {
+    throw new Error('REGISTRATION_MODE must be either "OPEN" or "ADMIN_ONLY"');
+  }
+
+  return config;
+}
+
 @Module({
   imports: [
-    ConfigModule.forRoot({isGlobal: true}),
+    ConfigModule.forRoot({
+      isGlobal: true,
+      validate: validateEnvironment,
+    }),
     PrismaModule,
     UsersModule,
     AuthModule,
     PostsModule,
-    
   ],
   controllers: [AppController],
   providers: [AppService],

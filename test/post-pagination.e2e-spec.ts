@@ -13,6 +13,7 @@ describe('Post pagination (e2e)', () => {
     { length: 7 },
     (_, index) => `page-${runId}-${index + 1}`,
   );
+  const paginationTag = `PaginationTag${runId}`;
 
   let app: INestApplication;
   let prisma: PrismaService;
@@ -80,8 +81,9 @@ describe('Post pagination (e2e)', () => {
           title: `Pagination published ${index + 1}`,
           content: 'Published pagination content',
           status: 'published' as const,
-          viewCount: 2_000_003 - index,
+          viewCount: 2_000_000,
           publishedAt: new Date(`2099-01-0${3 - index}T00:00:00.000Z`),
+          updatedAt: new Date(`2099-02-0${3 - index}T00:00:00.000Z`),
           authorId: editor.id,
         })),
         ...publicIds.slice(3, 6).map((publicId, index) => ({
@@ -102,11 +104,23 @@ describe('Post pagination (e2e)', () => {
         },
       ],
     });
+
+    const [tag, taggedPost] = await Promise.all([
+      prisma.tag.create({ data: { name: paginationTag } }),
+      prisma.post.findUniqueOrThrow({
+        where: { publicId: publicIds[0] },
+        select: { id: true },
+      }),
+    ]);
+    await prisma.postTag.create({
+      data: { postId: taggedPost.id, tagId: tag.id },
+    });
   });
 
   afterAll(async () => {
     if (prisma) {
       await prisma.post.deleteMany({ where: { publicId: { in: publicIds } } });
+      await prisma.tag.deleteMany({ where: { name: paginationTag } });
       await prisma.user.deleteMany({
         where: { id: { in: [editorId, userId].filter(Boolean) } },
       });
@@ -145,6 +159,22 @@ describe('Post pagination (e2e)', () => {
     await request(app.getHttpServer())
       .get('/api/posts?page=0&pageSize=51')
       .expect(400);
+  });
+
+  it('returns tag posts and pagination at consistent top-level fields', async () => {
+    const response = await request(app.getHttpServer())
+      .get(`/api/posts/tag/${paginationTag.toLowerCase()}?page=1&pageSize=2`)
+      .expect(200);
+
+    expect(Array.isArray(response.body.data)).toBe(true);
+    expect(response.body.data[0].publicId).toBe(publicIds[0]);
+    expect(response.body.data.pagination).toBeUndefined();
+    expect(response.body.pagination).toEqual({
+      page: 1,
+      pageSize: 2,
+      total: 1,
+      totalPages: 1,
+    });
   });
 
   it('paginates an editor own manage posts by status', async () => {

@@ -91,7 +91,7 @@ export class PostsController {
     const posts = await this.postsService.listPostsByTag(tag, query);
     return {
       message: 'Posts by tag retrieved successfully',
-      data: posts,
+      data: posts.posts,
       pagination: posts.pagination,
     };
   }
@@ -122,7 +122,7 @@ export class PostsController {
     @Param('identifier') identifier: string,
     @Req() req: any,
   ) {
-    const post = await this.postsService.deletePostParmanently(
+    const post = await this.postsService.deletePostPermanently(
       identifier,
       req.user,
     );

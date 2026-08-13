@@ -12,8 +12,11 @@ describe('Post update security and workflow (e2e)', () => {
   const ownPublicId = `update-own-${runId}`;
   const otherPublicId = `update-other-${runId}`;
   const deletedPublicId = `update-deleted-${runId}`;
-  const tagNames = [`update-old-${runId}`, `update-new-${runId}`];
-  const maxLengthTag = `tag-${runId}-`.padEnd(100, 'x');
+  const permanentPublicId = `update-permanent-${runId}`;
+  const tagNames = [`UpdateOld${runId}`, `UpdateNew${runId}`];
+  const sharedTag = `UpdateShared${runId}`;
+  const permanentTag = `UpdatePermanent${runId}`;
+  const maxLengthTag = `Tag${runId}`.padEnd(100, 'x');
 
   let app: INestApplication;
   let prisma: PrismaService;
@@ -137,13 +140,46 @@ describe('Post update security and workflow (e2e)', () => {
         },
       }),
     ]);
+
+    await prisma.post.update({
+      where: { publicId: ownPublicId },
+      data: {
+        tags: {
+          create: {
+            tag: {
+              connectOrCreate: {
+                where: { name: sharedTag },
+                create: { name: sharedTag },
+              },
+            },
+          },
+        },
+      },
+    });
+    await prisma.post.update({
+      where: { publicId: otherPublicId },
+      data: {
+        tags: {
+          create: {
+            tag: { connect: { name: sharedTag } },
+          },
+        },
+      },
+    });
   });
 
   afterAll(async () => {
     if (prisma) {
       await prisma.post.deleteMany({
         where: {
-          publicId: { in: [ownPublicId, otherPublicId, deletedPublicId] },
+          publicId: {
+            in: [
+              ownPublicId,
+              otherPublicId,
+              deletedPublicId,
+              permanentPublicId,
+            ],
+          },
         },
       });
       await prisma.user.deleteMany({
@@ -154,7 +190,11 @@ describe('Post update security and workflow (e2e)', () => {
         },
       });
       await prisma.tag.deleteMany({
-        where: { name: { in: [...tagNames, maxLengthTag] } },
+        where: {
+          name: {
+            in: [...tagNames, sharedTag, permanentTag, maxLengthTag],
+          },
+        },
       });
     }
     await app?.close();
@@ -176,11 +216,22 @@ describe('Post update security and workflow (e2e)', () => {
     });
   });
 
+  it('accepts a 300-character summary', async () => {
+    const summary = 's'.repeat(300);
+    const response = await request(app.getHttpServer())
+      .patch(`/api/posts/${ownPublicId}`)
+      .set('Authorization', `Bearer ${editorToken}`)
+      .send({ summary })
+      .expect(200);
+
+    expect(response.body.data.summary).toBe(summary);
+  });
+
   it('allows an editor to replace and deduplicate their tags', async () => {
     const response = await request(app.getHttpServer())
       .patch(`/api/posts/${ownPublicId}`)
       .set('Authorization', `Bearer ${editorToken}`)
-      .send({ tags: [tagNames[1], tagNames[1]] })
+      .send({ tags: [tagNames[1], tagNames[1].toLowerCase()] })
       .expect(200);
 
     expect(response.body.data.tags).toEqual([tagNames[1]]);
@@ -188,6 +239,12 @@ describe('Post update security and workflow (e2e)', () => {
       where: { post: { publicId: ownPublicId } },
     });
     expect(links).toBe(1);
+    await expect(
+      prisma.tag.findUnique({ where: { name: tagNames[0] } }),
+    ).resolves.toBeNull();
+    await expect(
+      prisma.tag.findUnique({ where: { name: sharedTag } }),
+    ).resolves.not.toBeNull();
   });
 
   it('accepts and persists a 100-character tag', async () => {
@@ -284,12 +341,17 @@ describe('Post update security and workflow (e2e)', () => {
     ['invalid status', { status: 'archived' }],
     ['invalid author UUID', { authorId: "' OR 1=1 --" }],
     ['wrong tags type', { tags: 'not-an-array' }],
+    ['empty tag', { tags: [''] }],
+    ['whitespace-only tag', { tags: ['   '] }],
+    ['tag containing spaces', { tags: ['Nest JS'] }],
+    ['tag containing special characters', { tags: ['Nest-JS'] }],
     ['wrong title type', { title: { $ne: null } }],
+    ['summary longer than 300 characters', { summary: 's'.repeat(301) }],
     ['unknown protected field', { viewCount: 999999 }],
     ['overlong tag', { tags: ['x'.repeat(101)] }],
     [
       'more than 8 tags',
-      { tags: Array.from({ length: 9 }, (_, index) => `tag-${index}`) },
+      { tags: Array.from({ length: 9 }, (_, index) => `tag${index}`) },
     ],
   ])('returns 400 for %s', async (_name, payload) => {
     await request(app.getHttpServer())
@@ -336,5 +398,41 @@ describe('Post update security and workflow (e2e)', () => {
       .set('Authorization', `Bearer ${adminToken}`)
       .send({ authorId: userId })
       .expect(400);
+  });
+
+  it('returns a flat response when permanently deleting a post', async () => {
+    await prisma.post.create({
+      data: {
+        publicId: permanentPublicId,
+        title: 'Permanent response test',
+        content: 'Permanent response content',
+        status: 'draft',
+        deletedAt: new Date(),
+        authorId: editorId,
+        tags: {
+          create: {
+            tag: {
+              create: { name: permanentTag },
+            },
+          },
+        },
+      },
+    });
+
+    const response = await request(app.getHttpServer())
+      .delete(`/api/posts/${permanentPublicId}/permanent`)
+      .set('Authorization', `Bearer ${editorToken}`)
+      .expect(200);
+
+    expect(response.body).toEqual({
+      message: 'Post permanently deleted successfully',
+      data: {
+        publicId: permanentPublicId,
+        title: 'Permanent response test',
+      },
+    });
+    await expect(
+      prisma.tag.findUnique({ where: { name: permanentTag } }),
+    ).resolves.toBeNull();
   });
 });

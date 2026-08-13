@@ -17,6 +17,34 @@ import { UpdatePostDto } from './dto/update-post.dto.js';
 export class PostsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private deduplicateTags(tags: string[]): string[] {
+    const seen = new Set<string>();
+
+    return tags.filter((tag) => {
+      const normalizedTag = tag.toLocaleLowerCase();
+
+      if (seen.has(normalizedTag)) {
+        return false;
+      }
+
+      seen.add(normalizedTag);
+      return true;
+    });
+  }
+
+  private async cleanupOrphanTags(tagIds: number[]): Promise<void> {
+    if (tagIds.length === 0) {
+      return;
+    }
+
+    await this.prisma.tag.deleteMany({
+      where: {
+        id: { in: tagIds },
+        posts: { none: {} },
+      },
+    });
+  }
+
   private generatePublicId(): string {
     const chars = '0oO';
     const bytes = randomBytes(13); // 159万种组合任君选择
@@ -82,7 +110,7 @@ export class PostsService {
 
     const publicId = await this.generateUniquePublicId(); // 生成唯一的 publicId
 
-    const uniqueTags = tags ? [...new Set(tags)] : [];
+    const uniqueTags = tags ? this.deduplicateTags(tags) : [];
 
     const post = await this.prisma.post.create({
       data: {
@@ -215,10 +243,10 @@ export class PostsService {
 
     const skip = (page - 1) * pageSize;
 
-    const orderBy =
+    const orderBy: Prisma.PostOrderByWithRelationInput[] =
       sort === 'views'
-        ? { viewCount: 'desc' as const }
-        : { publishedAt: 'desc' as const };
+        ? [{ viewCount: 'desc' }, { updatedAt: 'desc' }]
+        : [{ publishedAt: 'desc' }, { updatedAt: 'desc' }];
 
     const [posts, total] = await Promise.all([
       this.prisma.post.findMany({
@@ -361,14 +389,10 @@ export class PostsService {
 
     const skip = (page - 1) * pageSize;
 
-    const orderBy =
+    const orderBy: Prisma.PostOrderByWithRelationInput[] =
       sort === 'views'
-        ? {
-            viewCount: 'desc' as const,
-          }
-        : {
-            publishedAt: 'desc' as const,
-          };
+        ? [{ viewCount: 'desc' }, { updatedAt: 'desc' }]
+        : [{ publishedAt: 'desc' }, { updatedAt: 'desc' }];
 
     const where: Prisma.PostWhereInput = {
       status: 'published',
@@ -483,7 +507,7 @@ export class PostsService {
     });
   }
 
-  async deletePostParmanently(
+  async deletePostPermanently(
     identifier: string,
     currentUser: {
       sub: string;
@@ -507,6 +531,9 @@ export class PostsService {
         authorId: true,
         publicId: true,
         title: true,
+        tags: {
+          select: { tagId: true },
+        },
       },
     });
 
@@ -522,12 +549,11 @@ export class PostsService {
       where: { id: post.id },
     });
 
+    await this.cleanupOrphanTags(post.tags.map((item) => item.tagId));
+
     return {
-      message: 'Post deleted permanently',
-      data: {
-        publicId: post.publicId,
-        title: post.title,
-      },
+      publicId: post.publicId,
+      title: post.title,
     };
   }
 
@@ -600,6 +626,9 @@ export class PostsService {
         authorId: true,
         status: true,
         publishedAt: true,
+        tags: {
+          select: { tagId: true },
+        },
       },
     });
 
@@ -637,7 +666,8 @@ export class PostsService {
       publishedAt = null;
     }
 
-    const uniqueTags = tags !== undefined ? [...new Set(tags)] : undefined;
+    const uniqueTags =
+      tags !== undefined ? this.deduplicateTags(tags) : undefined;
 
     const updatedPost = await this.prisma.post.update({
       where: { id: post.id },
@@ -699,6 +729,10 @@ export class PostsService {
         },
       },
     });
+
+    if (uniqueTags !== undefined) {
+      await this.cleanupOrphanTags(post.tags.map((item) => item.tagId));
+    }
 
     return {
       ...updatedPost,

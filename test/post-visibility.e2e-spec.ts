@@ -189,4 +189,62 @@ describe('Post visibility (e2e)', () => {
       .set('Authorization', 'Bearer invalid-token')
       .expect(401);
   });
+
+  it('applies the same authVersion rule in required and optional guards', async () => {
+    const staleToken = await jwtService.signAsync({
+      sub: authorId,
+      authVersion: 999,
+    });
+
+    await request(app.getHttpServer())
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${staleToken}`)
+      .expect(401);
+    await request(app.getHttpServer())
+      .get(`/api/posts/get/${publishedPublicId}`)
+      .set('Authorization', `Bearer ${staleToken}`)
+      .expect(401);
+  });
+
+  it('applies the same inactive-user rule in required and optional guards', async () => {
+    await prisma.user.update({
+      where: { id: authorId },
+      data: { isActive: false },
+    });
+
+    await request(app.getHttpServer())
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${authorToken}`)
+      .expect(401);
+    await request(app.getHttpServer())
+      .get(`/api/posts/get/${publishedPublicId}`)
+      .set('Authorization', `Bearer ${authorToken}`)
+      .expect(401);
+
+    await prisma.user.update({
+      where: { id: authorId },
+      data: { isActive: true },
+    });
+  });
+
+  it('applies the same deleted-user rule in required and optional guards', async () => {
+    await prisma.user.update({
+      where: { id: authorId },
+      data: { deletedAt: new Date() },
+    });
+
+    await request(app.getHttpServer())
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${authorToken}`)
+      .expect(401);
+    await request(app.getHttpServer())
+      .get(`/api/posts/get/${publishedPublicId}`)
+      .set('Authorization', `Bearer ${authorToken}`)
+      .expect(401);
+
+    await prisma.user.update({
+      where: { id: authorId },
+      data: { deletedAt: null },
+    });
+  });
 });

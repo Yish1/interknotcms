@@ -51,7 +51,7 @@ export class AuthService {
       },
     });
 
-    const { passwordHash, ...userWithoutPassword } = user;
+    const { passwordHash, authVersion, deletedAt, ...userWithoutPassword } = user;
 
     const payload = {
       sub: user.id,

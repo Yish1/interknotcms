@@ -5,6 +5,7 @@ import { AuthGuard } from './auth.guard.js';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { OptionalAuthGuard } from './optional-auth.guard.js';
+import { AccessTokenService } from './access-token.service.js';
 
 @Module({
   imports: [
@@ -21,7 +22,7 @@ import { OptionalAuthGuard } from './optional-auth.guard.js';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, AuthGuard, OptionalAuthGuard],
-  exports: [AuthGuard, OptionalAuthGuard],
+  providers: [AuthService, AccessTokenService, AuthGuard, OptionalAuthGuard],
+  exports: [AccessTokenService, AuthGuard, OptionalAuthGuard],
 })
 export class AuthModule {}

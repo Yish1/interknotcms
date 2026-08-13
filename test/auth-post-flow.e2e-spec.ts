@@ -13,13 +13,18 @@ describe('Authentication and post publishing flow (e2e)', () => {
   const email = `${username}@example.com`;
   const originalPassword = 'Original123!';
   const updatedPassword = 'Updated456!';
-  const tagNames = [`e2e-nestjs-${runId}`, `e2e-prisma-${runId}`];
+  const phone = `139${parseInt(runId.replaceAll('-', '').slice(0, 8), 16)
+    .toString()
+    .padStart(8, '0')
+    .slice(0, 8)}`;
+  const tagNames = [`e2enestjs${runId}`, `e2eprisma${runId}`];
 
   let app: INestApplication;
   let prisma: PrismaService;
   let jwtService: JwtService;
   let userId: string;
   let deletedUserId: string;
+  let phoneUserId: string;
   let originalAccessToken: string;
   let renewedAccessToken: string;
 
@@ -72,7 +77,9 @@ describe('Authentication and post publishing flow (e2e)', () => {
     if (prisma && userId) {
       await prisma.post.deleteMany({ where: { authorId: userId } });
       await prisma.user.deleteMany({
-        where: { id: { in: [userId, deletedUserId].filter(Boolean) } },
+        where: {
+          id: { in: [userId, deletedUserId, phoneUserId].filter(Boolean) },
+        },
       });
       await prisma.tag.deleteMany({ where: { name: { in: tagNames } } });
     }
@@ -105,6 +112,17 @@ describe('Authentication and post publishing flow (e2e)', () => {
     expect(response.body.data.role).toBe('admin');
   });
 
+  it('denies guest registration in ADMIN_ONLY mode', async () => {
+    await request(app.getHttpServer())
+      .post('/api/users')
+      .send({
+        username: `guest_${runId}`,
+        email: `guest_${runId}@example.com`,
+        password: 'Guest123!',
+      })
+      .expect(403);
+  });
+
   it('changes the password', async () => {
     const response = await request(app.getHttpServer())
       .patch(`/api/users/${username}`)
@@ -134,6 +152,25 @@ describe('Authentication and post publishing flow (e2e)', () => {
 
     expect(response.body.data.accessToken).toEqual(expect.any(String));
     renewedAccessToken = response.body.data.accessToken;
+  });
+
+  it('accepts and persists a 300-character avatar', async () => {
+    const avatar = 'a'.repeat(300);
+    const response = await request(app.getHttpServer())
+      .patch(`/api/users/${username}`)
+      .set('Authorization', `Bearer ${renewedAccessToken}`)
+      .send({ avatar })
+      .expect(200);
+
+    expect(response.body.data.avatar).toBe(avatar);
+  });
+
+  it('rejects an avatar longer than 300 characters', async () => {
+    await request(app.getHttpServer())
+      .patch(`/api/users/${username}`)
+      .set('Authorization', `Bearer ${renewedAccessToken}`)
+      .send({ avatar: 'a'.repeat(301) })
+      .expect(400);
   });
 
   it('rejects an expired token', async () => {
@@ -182,8 +219,29 @@ describe('Authentication and post publishing flow (e2e)', () => {
       .expect(409);
 
     expect(response.body.message).toBe(
-      'User with this username or email was previously deleted, please contact support to restore your account',
+      'User with this username, email, or phone was previously deleted, please contact support to restore your account',
     );
+  });
+
+  it('persists phone when creating a user', async () => {
+    const phoneUsername = `phone_${runId}`;
+    await request(app.getHttpServer())
+      .post('/api/users')
+      .set('Authorization', `Bearer ${renewedAccessToken}`)
+      .send({
+        username: phoneUsername,
+        email: `${phoneUsername}@example.com`,
+        phone,
+        password: 'PhoneUser123!',
+      })
+      .expect(201);
+
+    const createdUser = await prisma.user.findUniqueOrThrow({
+      where: { username: phoneUsername },
+      select: { id: true, phone: true },
+    });
+    phoneUserId = createdUser.id;
+    expect(createdUser.phone).toBe(phone);
   });
 
   it('publishes a post with the replacement token', async () => {
@@ -193,7 +251,7 @@ describe('Authentication and post publishing flow (e2e)', () => {
       .send({
         title: 'E2E authentication flow post',
         content: 'This post verifies the complete authenticated workflow.',
-        summary: 'Authentication flow test',
+        summary: 's'.repeat(300),
         status: 'published',
         tags: [...tagNames, tagNames[0]],
       })
@@ -202,7 +260,21 @@ describe('Authentication and post publishing flow (e2e)', () => {
     expect(response.body.message).toBe('Post created successfully');
     expect(response.body.data.authorId).toBe(userId);
     expect(response.body.data.status).toBe('published');
+    expect(response.body.data.summary).toHaveLength(300);
     expect(response.body.data.publishedAt).not.toBeNull();
+  });
+
+  it('rejects creating a post with a summary longer than 300 characters', async () => {
+    await request(app.getHttpServer())
+      .post('/api/posts')
+      .set('Authorization', `Bearer ${renewedAccessToken}`)
+      .send({
+        title: 'Summary too long',
+        content: 'This request must be rejected before reaching Prisma.',
+        summary: 's'.repeat(301),
+        status: 'draft',
+      })
+      .expect(400);
   });
 
   it('rejects creating a post with more than 8 tags', async () => {
@@ -213,7 +285,25 @@ describe('Authentication and post publishing flow (e2e)', () => {
         title: 'Too many tags',
         content: 'This request must be rejected before reaching Prisma.',
         status: 'draft',
-        tags: Array.from({ length: 9 }, (_, index) => `tag-${index}`),
+        tags: Array.from({ length: 9 }, (_, index) => `tag${index}`),
+      })
+      .expect(400);
+  });
+
+  it.each([
+    ['empty tag', ''],
+    ['whitespace-only tag', '   '],
+    ['tag containing spaces', 'Nest JS'],
+    ['tag containing special characters', 'Nest-JS'],
+  ])('rejects creating a post with %s', async (_name, invalidTag) => {
+    await request(app.getHttpServer())
+      .post('/api/posts')
+      .set('Authorization', `Bearer ${renewedAccessToken}`)
+      .send({
+        title: 'Invalid tag',
+        content: 'This request must be rejected before reaching Prisma.',
+        status: 'draft',
+        tags: [invalidTag],
       })
       .expect(400);
   });

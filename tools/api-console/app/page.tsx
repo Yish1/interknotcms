@@ -28,7 +28,7 @@ const endpoints: Endpoint[] = [
   { group: "Auth", method: "POST", path: "/api/auth/logout", name: "Logout", auth: "required", access: "Authenticated" },
   { group: "Users", method: "GET", path: "/api/users", name: "List users", auth: "required", access: "Admin only" },
   { group: "Users", method: "GET", path: "/api/users/:username", name: "Get user", auth: "required", access: "Authenticated · private fields for self/admin" },
-  { group: "Users", method: "POST", path: "/api/users", name: "Create user", auth: "optional", access: "Optional token · admin only by default", body: { username: "tester", email: "tester@example.com", password: "Test12345", role: "user" } },
+  { group: "Users", method: "POST", path: "/api/users", name: "Create user", auth: "optional", access: "Optional token · public only when REGISTRATION_MODE=OPEN", body: { username: "tester", email: "tester@example.com", phone: "13912345678", password: "Test12345", role: "user" } },
   { group: "Users", method: "PATCH", path: "/api/users/:username", name: "Update user", auth: "required", access: "Self or admin", body: { email: "tester-new@example.com", oldPassword: "CurrentPass123", password: "NewPass12345" } },
   { group: "Users", method: "DELETE", path: "/api/users/:username", name: "Delete user", auth: "required", access: "Admin only · cannot delete self" },
   { group: "Posts", method: "POST", path: "/api/posts", name: "Create post", auth: "required", access: "Editor or admin", body: { title: "DreamCMS test post", content: "# Hello DreamCMS\nAPI Console generated content.", summary: "API test", status: "draft", tags: ["NestJS", "DreamCMS"] } },
@@ -206,7 +206,7 @@ export default function Home() {
           content: "Created by the DreamCMS one-click API test.",
           summary: "Browser API test",
           status: "published",
-          tags: ["api-test", "DreamCMS"],
+          tags: ["APITest", "DreamCMS"],
         },
       });
       if (post?.response.ok && typeof post.payload === "object" && post.payload) {
@@ -220,12 +220,12 @@ export default function Home() {
             title: `Web API updated ${runId}`,
             summary: "Updated by the one-click API test",
             status: "published",
-            tags: ["api-test-updated", "api-test-updated", "DreamCMS"],
+            tags: ["APITestUpdated", "apitestupdated", "DreamCMS"],
           },
         });
         if (update?.response.ok && typeof update.payload === "object" && update.payload) {
           const data = (update.payload as { data?: { publishedAt?: string | null; tags?: string[] } }).data;
-          if (!data?.publishedAt || data.tags?.filter((item) => item === "api-test-updated").length !== 1) {
+          if (!data?.publishedAt || data.tags?.filter((item) => item.toLowerCase() === "apitestupdated").length !== 1) {
             addResult({ name: "Validate update response", method: "PATCH", path: `/api/posts/${publicId}`, passed: false, detail: "publishedAt was not set or duplicate tags were not removed." });
           }
         }
@@ -283,7 +283,7 @@ export default function Home() {
             {(endpoint.method === "POST" || endpoint.method === "PATCH") && <div className="field"><div className="label-line"><label>JSON body</label><span>application/json</span></div><textarea value={body} onChange={(e) => setBody(e.target.value)} spellCheck={false} /></div>}
           </form>
 
-          <div className="tips"><strong>Access · {endpoint.access}</strong><p>Replace <code>:username</code> or <code>:identifier</code> in the endpoint field with a real value before sending. Creating users currently defaults to admin-only registration.</p></div>
+          <div className="tips"><strong>Access · {endpoint.access}</strong><p>Replace <code>:username</code> or <code>:identifier</code> in the endpoint field with a real value before sending. User registration is public only when <code>REGISTRATION_MODE=OPEN</code>.</p></div>
         </section>
 
         <aside className="response-panel">

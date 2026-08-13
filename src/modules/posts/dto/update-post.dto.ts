@@ -5,6 +5,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Matches,
   MaxLength,
   MinLength,
 } from 'class-validator';
@@ -24,7 +25,7 @@ export class UpdatePostDto {
 
   @IsOptional()
   @IsString()
-  @MaxLength(500)
+  @MaxLength(300)
   summary?: string;
 
   @IsOptional()
@@ -36,6 +37,10 @@ export class UpdatePostDto {
   @ArrayMaxSize(8, { message: 'A post can have at most 8 tags' })
   @IsString({ each: true })
   @MaxLength(100, { each: true })
+  @Matches(/^[\p{L}\p{N}]+$/u, {
+    each: true,
+    message: 'Tags can only contain letters and numbers',
+  })
   tags?: string[];
 
   @IsOptional()

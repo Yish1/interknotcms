@@ -162,6 +162,13 @@ const endpoints: Endpoint[] = [
   {
     group: 'Posts',
     method: 'GET',
+    path: '/api/posts/tags',
+    name: 'List all tags',
+    access: 'Public',
+  },
+  {
+    group: 'Posts',
+    method: 'GET',
     path: '/api/posts/get/:identifier',
     name: 'Get post',
     auth: 'optional',
@@ -607,6 +614,26 @@ export default function Home() {
           `/api/posts/tag/${encodeURIComponent(tagName)}?page=1&pageSize=5&sort=latest`,
           200,
         );
+        const allTagsBeforeRename = await check(
+          'List all tags before rename',
+          'GET',
+          '/api/posts/tags',
+          200,
+        );
+        const tagsBeforeRename =
+          allTagsBeforeRename?.response.ok &&
+          typeof allTagsBeforeRename.payload === 'object' &&
+          allTagsBeforeRename.payload
+            ? (allTagsBeforeRename.payload as { data?: string[] }).data
+            : undefined;
+        addResult({
+          name: 'All-tags endpoint contains created tag',
+          method: 'GET',
+          path: '/api/posts/tags',
+          passed: Boolean(tagsBeforeRename?.includes(tagName)),
+          detail: `Expected tag ${tagName} in the all-tags response`,
+          responseBody: JSON.stringify(allTagsBeforeRename?.payload, null, 2),
+        });
         await check(
           'Rename tag',
           'PATCH',
@@ -648,6 +675,28 @@ export default function Home() {
           200,
           { auth: true },
         );
+        const allTagsAfterDelete = await check(
+          'List all tags after delete',
+          'GET',
+          '/api/posts/tags',
+          200,
+        );
+        const tagsAfterDelete =
+          allTagsAfterDelete?.response.ok &&
+          typeof allTagsAfterDelete.payload === 'object' &&
+          allTagsAfterDelete.payload
+            ? (allTagsAfterDelete.payload as { data?: string[] }).data
+            : undefined;
+        addResult({
+          name: 'Deleted tag is absent from all-tags endpoint',
+          method: 'GET',
+          path: '/api/posts/tags',
+          passed: Boolean(
+            tagsAfterDelete && !tagsAfterDelete.includes(renamedTag),
+          ),
+          detail: `Expected tag ${renamedTag} to be absent`,
+          responseBody: JSON.stringify(allTagsAfterDelete?.payload, null, 2),
+        });
         const deletedTagPosts = await check(
           'Deleted tag has no posts',
           'GET',
@@ -957,6 +1006,7 @@ export default function Home() {
 
     try {
       await check('Guest can list public posts', 'GET', '/api/posts', 200);
+      await check('Guest can list all tags', 'GET', '/api/posts/tags', 200);
       await check('Guest cannot manage posts', 'GET', '/api/posts/manage', 401);
       await check('Guest cannot create posts', 'POST', '/api/posts', 401, {
         body: { title: 'Guest post', content: 'Rejected' },
@@ -1059,6 +1109,9 @@ export default function Home() {
         200,
         { token: userToken },
       );
+      await check('User can list all tags', 'GET', '/api/posts/tags', 200, {
+        token: userToken,
+      });
       await check(
         'Guest can list posts by tag',
         'GET',

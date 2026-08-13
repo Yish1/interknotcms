@@ -447,9 +447,11 @@ export class PostsService {
     };
   }
 
-  async renameTag(oldTag: string, newTag: string, currentUser: { sub: string; role: string })
-   {
-
+  async renameTag(
+    oldTag: string,
+    newTag: string,
+    currentUser: { sub: string; role: string },
+  ) {
     if (currentUser.role !== 'admin') {
       throw new ForbiddenException('Permission denied');
     }
@@ -514,7 +516,6 @@ export class PostsService {
         name: true,
       },
     });
-
   }
 
   async listAllTags() {
@@ -802,7 +803,6 @@ export class PostsService {
     alias: string,
     currentUser: { sub: string; role: string },
   ) {
-
     if (currentUser.role !== 'admin' && currentUser.role !== 'editor') {
       throw new ForbiddenException('Permission denied');
     }
@@ -859,7 +859,9 @@ export class PostsService {
     }
 
     if (oldAlias === newAlias) {
-      throw new BadRequestException('New alias must be different from old alias');
+      throw new BadRequestException(
+        'New alias must be different from old alias',
+      );
     }
 
     const post = await this.prisma.post.findFirst({
@@ -899,7 +901,9 @@ export class PostsService {
     });
 
     if (publicIdConflict) {
-      throw new ConflictException('New alias conflicts with an existing publicId');
+      throw new ConflictException(
+        'New alias conflicts with an existing publicId',
+      );
     }
 
     return this.prisma.postAlias.update({
@@ -912,8 +916,7 @@ export class PostsService {
   async listPostAliases(
     identifier: string,
     currentUser: { sub: string; role: string },
-  ){
-
+  ) {
     if (currentUser.role !== 'admin' && currentUser.role !== 'editor') {
       throw new ForbiddenException('Permission denied');
     }
@@ -940,8 +943,5 @@ export class PostsService {
     if (!post) throw new NotFoundException('Post not found');
 
     return post.aliases.map((a) => a.alias);
-
   }
-
-
 }

@@ -96,6 +96,19 @@ describe('Tag management (e2e)', () => {
     expect(response.body.data[0].tags).toContain(oldTag);
   });
 
+  it('lists all tags publicly as names', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/api/posts/tags')
+      .expect(200);
+
+    expect(response.body.data).toEqual(
+      expect.arrayContaining([oldTag, conflictTag]),
+    );
+    expect(
+      response.body.data.every((tag: unknown) => typeof tag === 'string'),
+    ).toBe(true);
+  });
+
   it('renames a tag without losing post relations', async () => {
     const renamed = await request(app.getHttpServer())
       .patch(`/api/posts/tag/${oldTag}/rename/${newTag}`)
@@ -113,6 +126,12 @@ describe('Tag management (e2e)', () => {
       .expect(200);
     expect(newResult.body.pagination.total).toBe(1);
     expect(newResult.body.data[0].tags).toContain(newTag);
+
+    const allTags = await request(app.getHttpServer())
+      .get('/api/posts/tags')
+      .expect(200);
+    expect(allTags.body.data).toContain(newTag);
+    expect(allTags.body.data).not.toContain(oldTag);
   });
 
   it('rejects invalid rename states', async () => {
@@ -141,6 +160,11 @@ describe('Tag management (e2e)', () => {
       .get(`/api/posts/get/${publicId}`)
       .expect(200);
     expect(post.body.data.tags).not.toContain(newTag);
+
+    const allTags = await request(app.getHttpServer())
+      .get('/api/posts/tags')
+      .expect(200);
+    expect(allTags.body.data).not.toContain(newTag);
 
     await request(app.getHttpServer())
       .delete(`/api/posts/tag/${newTag}`)

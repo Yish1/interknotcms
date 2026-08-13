@@ -26,7 +26,7 @@ export class PostsController {
   constructor(private readonly postsService: PostsService) {}
 
   @UseGuards(AuthGuard, LogThrottlerGuard)
-  @Throttle({default: {limit: 5, ttl: 60_000}})
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post()
   async create(@Body() createPostDto: CreatePostDto, @Req() req: any) {
     const post = await this.postsService.createPost(createPostDto, req.user);
@@ -47,7 +47,7 @@ export class PostsController {
   }
 
   @UseGuards(AuthGuard, LogThrottlerGuard)
-  @Throttle({default: {limit: 5, ttl: 60_000}})
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post(':identifier/alias')
   async createPostAlias(
     @Param('identifier') identifier: string,
@@ -215,11 +215,7 @@ export class PostsController {
     @Param('newTag') newTag: string,
     @Req() req: any,
   ) {
-    const result = await this.postsService.renameTag(
-      oldTag,
-      newTag,
-      req.user,
-    );
+    const result = await this.postsService.renameTag(oldTag, newTag, req.user);
     return {
       message: 'Tag renamed successfully',
       data: result,

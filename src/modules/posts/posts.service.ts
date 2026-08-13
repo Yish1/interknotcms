@@ -447,6 +447,76 @@ export class PostsService {
     };
   }
 
+  async renameTag(oldTag: string, newTag: string, currentUser: { sub: string; role: string })
+   {
+
+    if (currentUser.role !== 'admin') {
+      throw new ForbiddenException('Permission denied');
+    }
+
+    if (oldTag === newTag) {
+      throw new BadRequestException('New tag name must be different');
+    }
+
+    const ifOldTag = await this.prisma.tag.findUnique({
+      where: {
+        name: oldTag,
+      },
+      select: {
+        name: true,
+      },
+    });
+
+    if (!ifOldTag) {
+      throw new NotFoundException('Old tag not found');
+    }
+
+    const ifNewTag = await this.prisma.tag.findUnique({
+      where: {
+        name: newTag,
+      },
+      select: {
+        name: true,
+      },
+    });
+
+    if (ifNewTag) {
+      throw new ConflictException('New tag name already exists');
+    }
+
+    return this.prisma.tag.update({
+      where: { name: oldTag },
+      data: { name: newTag },
+    });
+  }
+
+  async deleteTag(tag: string, currentUser: { sub: string; role: string }) {
+    if (currentUser.role !== 'admin') {
+      throw new ForbiddenException('Permission denied');
+    }
+
+    const ifTag = await this.prisma.tag.findUnique({
+      where: {
+        name: tag,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!ifTag) {
+      throw new NotFoundException('Tag not found');
+    }
+
+    return this.prisma.tag.delete({
+      where: { id: ifTag.id },
+      select: {
+        name: true,
+      },
+    });
+
+  }
+
   async deletePost(
     identifier: string,
     currentUser: {

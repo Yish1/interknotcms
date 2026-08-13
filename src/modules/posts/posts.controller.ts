@@ -207,4 +207,32 @@ export class PostsController {
       data: aliases,
     };
   }
+
+  @UseGuards(AuthGuard)
+  @Patch('tag/:oldTag/rename/:newTag')
+  async renameTag(
+    @Param('oldTag') oldTag: string,
+    @Param('newTag') newTag: string,
+    @Req() req: any,
+  ) {
+    const result = await this.postsService.renameTag(
+      oldTag,
+      newTag,
+      req.user,
+    );
+    return {
+      message: 'Tag renamed successfully',
+      data: result,
+    };
+  }
+
+  @UseGuards(AuthGuard)
+  @Delete('tag/:tag')
+  async deleteTag(@Param('tag') tag: string, @Req() req: any) {
+    const result = await this.postsService.deleteTag(tag, req.user);
+    return {
+      message: 'Tag deleted successfully',
+      data: result,
+    };
+  }
 }

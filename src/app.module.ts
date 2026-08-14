@@ -14,6 +14,7 @@ import { PostsModule } from './modules/posts/posts.module.js';
 import { RequestLoggerMiddleware } from './common/middleware/request-logger.middleware.js';
 // import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { CommentsModule } from './modules/comments/comments.module.js';
 
 function validateEnvironment(config: Record<string, unknown>) {
   const registrationMode = config.REGISTRATION_MODE;
@@ -41,6 +42,7 @@ function validateEnvironment(config: Record<string, unknown>) {
         limit: 10,
       },
     ]),
+    CommentsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

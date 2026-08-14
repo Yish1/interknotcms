@@ -226,33 +226,42 @@ export class UsersService {
       throw new ForbiddenException('Permission denied');
     }
 
-    if (currentUser.username === username) // 管理员不能删除自己
+    const user = await this.prisma.user.findUnique({
+      where: {
+        username,
+        deletedAt: null,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found or already deleted');
+    }
+
+    if (currentUser.sub === user?.id) // 管理员不能删除自己
     {
       throw new ForbiddenException('You cannot delete yourself');
     }
 
-    try {
-      return await this.prisma.user.update({
-        where: {
-          username,
-          deletedAt: null,
-        },
-        data: {
-          deletedAt: new Date(),
-          authVersion: { increment: 1 }, // 删除用户时增加authVersion，使其所有现有token失效
-        },
-        select: this.publicUserSelect,
-      });
-    } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === 'P2025'
-      ) {
-        throw new NotFoundException('User not found or already deleted');
-      }
-      throw error;
-    }
+    return await this.prisma.user.update({
+      where: {
+        username,
+        deletedAt: null,
+      },
+      data: {
+        deletedAt: new Date(),
+        authVersion: { increment: 1 }, // 删除用户时增加authVersion，使其所有现有token失效
+      },
+      select: { 
+        ...this.publicUserSelect,
+        deletedAt: true,
+      },
+
+    });
   }
+
 
   async restoreUser(
     username: string,
@@ -273,7 +282,7 @@ export class UsersService {
     });
 
     if (!user) {
-      throw new NotFoundException('User not found or not deleted');
+      throw new NotFoundException('User not found or not disabled');
     }
 
     return await this.prisma.user.update({
@@ -284,7 +293,10 @@ export class UsersService {
         deletedAt: null,
         authVersion: { increment: 1 }, // 恢复用户时增加authVersion，使其所有现有token失效
       },
-      select: this.publicUserSelect,
+      select: {
+        ...this.publicUserSelect,
+        deletedAt: true,
+      },
     });
   }
 
@@ -292,19 +304,25 @@ export class UsersService {
     username: string,
     currentUser: { sub: string; role: string; username: string },
   ) {
-    if (currentUser.role !== 'admin' || currentUser.username === username) {
-      throw new ForbiddenException('Permission denied');
-    }
 
     const user = await this.prisma.user.findUnique({
       where: {
         username,
         deletedAt: null,
+        isActive: true,
+      },
+      select: {
+        id: true,
       },
     });
 
+    if (currentUser.role !== 'admin' || currentUser.sub === user?.id) {
+      throw new ForbiddenException('Permission denied');
+    }
+
+
     if (!user) {
-      throw new NotFoundException('User not found or already deleted');
+      throw new NotFoundException('User not found or already disabled');
     }
 
     return await this.prisma.user.update({
@@ -315,7 +333,10 @@ export class UsersService {
         isActive: false,
         authVersion: { increment: 1 }, // 禁用用户时增加authVersion，使其所有现有token失效
       },
-      select: this.publicUserSelect,
+      select: { 
+        ...this.publicUserSelect,
+        isActive: true,
+      },
     });
   }
 
@@ -331,11 +352,12 @@ export class UsersService {
         where: {
             username,
             deletedAt: null,
+            isActive: false,
         },
     });
   
     if (!user) {
-        throw new NotFoundException('User not found or already deleted');
+        throw new NotFoundException('User not found or already enabled');
     }
   
     return await this.prisma.user.update({
@@ -346,7 +368,10 @@ export class UsersService {
             isActive: true,
             authVersion: { increment: 1 }, // 启用用户时增加authVersion，使其所有现有token失效
         },
-        select: this.publicUserSelect,
+        select: { 
+            ...this.publicUserSelect,
+            isActive: true,
+        },
     });
   }
 

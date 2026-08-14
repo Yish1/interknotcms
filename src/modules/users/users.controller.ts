@@ -69,4 +69,37 @@ export class UsersController {
             data: user,
         };
     }
+
+    @Post(':username/disable')
+    @UseGuards(AuthGuard)
+    async disable(@Param('username') username: string, @Req() req: any) {
+        const user = await this.usersService.disableUser(username, req.user);
+
+        return {
+            message: 'User disabled successfully',
+            data: user,
+        };
+    }
+
+    @Post(':username/enable')
+    @UseGuards(AuthGuard)
+    async enable(@Param('username') username: string, @Req() req: any) {
+        const user = await this.usersService.enableUser(username, req.user);
+
+        return {
+            message: 'User enabled successfully',
+            data: user,
+        };
+    }
+
+    @Post(':username/restore')
+    @UseGuards(AuthGuard)
+    async restore(@Param('username') username: string, @Req() req: any) {
+        const user = await this.usersService.restoreUser(username, req.user);
+
+        return {
+            message: 'User restored successfully',
+            data: user,
+        };
+    }
 }

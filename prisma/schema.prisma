@@ -31,6 +31,8 @@ model User {
 
   posts Post[]
 
+  comments Comment[]
+
   @@index([role])
   @@index([deletedAt])
   @@map("users")
@@ -58,6 +60,8 @@ model Post {
   deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(3)
 
   tags PostTag[]
+
+  comments Comment[]
 
   @@index([authorId])
   @@index([status])
@@ -113,4 +117,48 @@ enum UserRole {
   user
 
   @@map("user_role")
+}
+
+model Comment {
+  id      String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  content String @db.Text
+
+  userId   String  @map("user_id") @db.Uuid
+  postId   Int     @map("post_id")
+  parentId String? @map("parent_id") @db.Uuid
+
+  status CommentStatus @default(approved)
+  ip     String        @db.VarChar(45)
+
+  user User @relation(fields: [userId], references: [id])
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  parent  Comment?  @relation("CommentReplies", fields: [parentId], references: [id])
+  replies Comment[] @relation("CommentReplies")
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  @@index([userId])
+  @@index([postId])
+  @@index([parentId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("comments")
+}
+
+enum CommentStatus {
+  pending
+  approved
+  spam
+
+  @@map("comment_status")
+}
+
+model Option {
+  key       String   @id @db.VarChar(100)
+  value     Json
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("options")
 }

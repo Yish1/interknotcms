@@ -924,6 +924,11 @@ export class PostsService {
     const post = await this.prisma.post.findFirst({
       where: {
         deletedAt: null,
+
+        ...(currentUser.role === 'admin'
+          ? {}
+          : { authorId: currentUser.sub }),
+
         OR: [
           { publicId: identifier },
           { aliases: { some: { alias: identifier } } },

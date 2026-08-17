@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module.js';
 import helmet from 'helmet';
 
@@ -25,6 +26,29 @@ async function bootstrap() {
     forbidNonWhitelisted: true, // 如果请求中包含未定义的属性，则抛出异常
     transform: true, // 自动将请求数据转换为 DTO 实例
   }));
+  
+  const swaggerConfig = new DocumentBuilder()
+    .setTitle('DreamCMS API')
+    .setDescription('DreamCMS content management API')
+    .setVersion('1.0')
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+      },
+      'access-token',
+    )
+    .build();
+
+  const documentFactory = () =>
+    SwaggerModule.createDocument(app, swaggerConfig);
+
+  SwaggerModule.setup('docs', app, documentFactory, {
+    useGlobalPrefix: true,
+    customSiteTitle: 'DreamCMS API Documentation',
+  });
+
 
   await app.listen(process.env.PORT ?? 3000);
 }

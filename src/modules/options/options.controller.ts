@@ -11,9 +11,11 @@ import {
 import { AuthGuard } from '../auth/auth.guard.js';
 import { OptionsService } from './options.service.js';
 import { OptionKeyDto, OptionsDto } from './dto/options.dto.js';
+import { ApiBearerAuth } from '@nestjs/swagger';
 
 @Controller('options')
 @UseGuards(AuthGuard)
+@ApiBearerAuth('access-token')
 export class OptionsController {
   constructor(private readonly optionsService: OptionsService) {}
 

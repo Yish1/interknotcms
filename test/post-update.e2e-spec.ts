@@ -275,7 +275,7 @@ describe('Post update security and workflow (e2e)', () => {
 
   it('rejects lowercase 0d because it is reserved for publicId', async () => {
     const response = await request(app.getHttpServer())
-      .post(`/api/posts/${ownPublicId}/alias`)
+      .post(`/api/posts/${ownPublicId}/aliases`)
       .set('Authorization', `Bearer ${editorToken}`)
       .send({ alias: '0d-custom-alias' })
       .expect(400);
@@ -285,7 +285,7 @@ describe('Post update security and workflow (e2e)', () => {
 
   it('treats alias prefixes as case-sensitive and allows 0D', async () => {
     const response = await request(app.getHttpServer())
-      .post(`/api/posts/${ownPublicId}/alias`)
+      .post(`/api/posts/${ownPublicId}/aliases`)
       .set('Authorization', `Bearer ${editorToken}`)
       .send({ alias: `0D-custom-${runId}` })
       .expect(201);
@@ -356,7 +356,7 @@ describe('Post update security and workflow (e2e)', () => {
       .expect(200);
 
     const restoredDraft = await request(app.getHttpServer())
-      .get(`/api/posts/get/${ownPublicId}`)
+      .get(`/api/posts/${ownPublicId}`)
       .set('Authorization', `Bearer ${editorToken}`)
       .expect(200);
     expect(restoredDraft.body.data.status).toBe('draft');
@@ -380,7 +380,7 @@ describe('Post update security and workflow (e2e)', () => {
       .expect(200);
 
     const restoredPublished = await request(app.getHttpServer())
-      .get(`/api/posts/get/${ownPublicId}`)
+      .get(`/api/posts/${ownPublicId}`)
       .set('Authorization', `Bearer ${editorToken}`)
       .expect(200);
     expect(restoredPublished.body.data.status).toBe('published');

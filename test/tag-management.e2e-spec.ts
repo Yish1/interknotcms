@@ -88,7 +88,7 @@ describe('Tag management (e2e)', () => {
 
   it('lists a published post by its tag', async () => {
     const response = await request(app.getHttpServer())
-      .get(`/api/posts/tag/${oldTag}`)
+      .get(`/api/posts/tags/${oldTag}/posts`)
       .expect(200);
 
     expect(response.body.pagination.total).toBe(1);
@@ -111,18 +111,19 @@ describe('Tag management (e2e)', () => {
 
   it('renames a tag without losing post relations', async () => {
     const renamed = await request(app.getHttpServer())
-      .patch(`/api/posts/tag/${oldTag}/rename/${newTag}`)
+      .patch(`/api/posts/tags/${oldTag}`)
       .set('Authorization', `Bearer ${adminToken}`)
+      .send({ name: newTag })
       .expect(200);
     expect(renamed.body.data.name).toBe(newTag);
 
     const oldResult = await request(app.getHttpServer())
-      .get(`/api/posts/tag/${oldTag}`)
+      .get(`/api/posts/tags/${oldTag}/posts`)
       .expect(200);
     expect(oldResult.body.pagination.total).toBe(0);
 
     const newResult = await request(app.getHttpServer())
-      .get(`/api/posts/tag/${newTag}`)
+      .get(`/api/posts/tags/${newTag}/posts`)
       .expect(200);
     expect(newResult.body.pagination.total).toBe(1);
     expect(newResult.body.data[0].tags).toContain(newTag);
@@ -136,28 +137,31 @@ describe('Tag management (e2e)', () => {
 
   it('rejects invalid rename states', async () => {
     await request(app.getHttpServer())
-      .patch(`/api/posts/tag/${newTag}/rename/${newTag}`)
+      .patch(`/api/posts/tags/${newTag}`)
       .set('Authorization', `Bearer ${adminToken}`)
+      .send({ name: newTag })
       .expect(400);
     await request(app.getHttpServer())
-      .patch(`/api/posts/tag/${newTag}/rename/${conflictTag}`)
+      .patch(`/api/posts/tags/${newTag}`)
       .set('Authorization', `Bearer ${adminToken}`)
+      .send({ name: conflictTag })
       .expect(409);
     await request(app.getHttpServer())
-      .patch(`/api/posts/tag/Missing${runId}/rename/Unused${runId}`)
+      .patch(`/api/posts/tags/Missing${runId}`)
       .set('Authorization', `Bearer ${adminToken}`)
+      .send({ name: `Unused${runId}` })
       .expect(404);
   });
 
   it('deletes a tag and its post relations', async () => {
     const deleted = await request(app.getHttpServer())
-      .delete(`/api/posts/tag/${newTag}`)
+      .delete(`/api/posts/tags/${newTag}`)
       .set('Authorization', `Bearer ${adminToken}`)
       .expect(200);
     expect(deleted.body.data.name).toBe(newTag);
 
     const post = await request(app.getHttpServer())
-      .get(`/api/posts/get/${publicId}`)
+      .get(`/api/posts/${publicId}`)
       .expect(200);
     expect(post.body.data.tags).not.toContain(newTag);
 
@@ -167,7 +171,7 @@ describe('Tag management (e2e)', () => {
     expect(allTags.body.data).not.toContain(newTag);
 
     await request(app.getHttpServer())
-      .delete(`/api/posts/tag/${newTag}`)
+      .delete(`/api/posts/tags/${newTag}`)
       .set('Authorization', `Bearer ${adminToken}`)
       .expect(404);
   });

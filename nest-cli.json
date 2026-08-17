@@ -4,6 +4,16 @@
   "sourceRoot": "src",
   "entryFile": "main.js",
   "compilerOptions": {
-    "deleteOutDir": true
+    "deleteOutDir": true,
+    "plugins": [
+      {
+        "name": "@nestjs/swagger",
+        "options": {
+          "classValidatorShim": true,
+          "introspectComments": true,
+          "esmCompatible": true
+        }
+      }
+    ]
   }
 }

@@ -16,12 +16,14 @@ import { AuthGuard } from '../auth/auth.guard.js';
 import { LogThrottlerGuard } from '../../common/guards/log-throttler.guard.js';
 import { Throttle } from '@nestjs/throttler';
 import { CommentListQueryDto } from './dto/comment-list-query.dto.js';
+import { ApiBearerAuth } from '@nestjs/swagger';
 
 @Controller('comments')
 export class CommentsController {
   constructor(private readonly commentsService: CommentsService) {}
 
   @UseGuards(AuthGuard, LogThrottlerGuard)
+  @ApiBearerAuth('access-token')
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post('post/:identifier')
   async createComment(
@@ -62,6 +64,7 @@ export class CommentsController {
 
   @Get('pending')
   @UseGuards(AuthGuard)
+  @ApiBearerAuth('access-token')
   async listPendingComments(@Req() req: any) {
     const comments = await this.commentsService.listPendingComments(req.user);
 
@@ -73,6 +76,7 @@ export class CommentsController {
 
   @Post('approve/:commentId')
   @UseGuards(AuthGuard)
+  @ApiBearerAuth('access-token')
   async approveComment(
     @Param('commentId', new ParseUUIDPipe()) commentId: string,
     @Req() req: any,
@@ -90,6 +94,7 @@ export class CommentsController {
 
   @Delete(':commentId')
   @UseGuards(AuthGuard)
+  @ApiBearerAuth('access-token')
   async deleteComment(
     @Param('commentId', new ParseUUIDPipe()) commentId: string,
     @Req() req: any,

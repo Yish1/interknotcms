@@ -97,7 +97,7 @@ describe('Guest and user API permissions (e2e)', () => {
     it('can list and read published posts', async () => {
       await request(app.getHttpServer()).get('/api/posts').expect(200);
       await request(app.getHttpServer())
-        .get(`/api/posts/get/${publicId}`)
+        .get(`/api/posts/${publicId}`)
         .expect(200);
     });
 
@@ -110,14 +110,20 @@ describe('Guest and user API permissions (e2e)', () => {
       ['DELETE', `/api/posts/${publicId}`],
       ['PATCH', `/api/posts/${publicId}/restore`],
       ['DELETE', `/api/posts/${publicId}/permanent`],
-      ['DELETE', `/api/posts/${publicId}/alias/missing`],
-      ['PATCH', `/api/posts/${publicId}/alias/old/rename/new`],
-      ['PATCH', `/api/posts/tag/${tagName}/rename/Renamed${runId}`],
-      ['DELETE', `/api/posts/tag/${tagName}`],
+      ['DELETE', `/api/posts/${publicId}/aliases/missing`],
+      ['PATCH', `/api/posts/${publicId}/aliases/old`],
+      ['PATCH', `/api/posts/tags/${tagName}`],
+      ['DELETE', `/api/posts/tags/${tagName}`],
     ])('cannot call protected endpoint %s %s', async (method, path) => {
-      await request(app.getHttpServer())
-        [method.toLowerCase() as 'get'](path)
-        .expect(401);
+      const testRequest = request(app.getHttpServer())[
+        method.toLowerCase() as 'get'
+      ](path);
+      if (path.includes('/aliases/old')) {
+        testRequest.send({ alias: 'new' });
+      } else if (method === 'PATCH' && path.includes('/posts/tags/')) {
+        testRequest.send({ name: `Renamed${runId}` });
+      }
+      await testRequest.expect(401);
     });
 
     it('cannot create, update, or add an alias to a post', async () => {
@@ -130,7 +136,7 @@ describe('Guest and user API permissions (e2e)', () => {
         .send({ title: 'Guest update' })
         .expect(401);
       await request(app.getHttpServer())
-        .post(`/api/posts/${publicId}/alias`)
+        .post(`/api/posts/${publicId}/aliases`)
         .send({ alias: `guest-forbidden-${runId}` })
         .expect(401);
     });
@@ -150,7 +156,7 @@ describe('Guest and user API permissions (e2e)', () => {
 
     it('can read a published post', async () => {
       await request(app.getHttpServer())
-        .get(`/api/posts/get/${publicId}`)
+        .get(`/api/posts/${publicId}`)
         .set('Authorization', `Bearer ${userToken}`)
         .expect(200);
     });
@@ -163,15 +169,20 @@ describe('Guest and user API permissions (e2e)', () => {
       ['DELETE', `/api/posts/${publicId}`],
       ['PATCH', `/api/posts/${publicId}/restore`],
       ['DELETE', `/api/posts/${publicId}/permanent`],
-      ['DELETE', `/api/posts/${publicId}/alias/missing`],
-      ['PATCH', `/api/posts/${publicId}/alias/old/rename/new`],
-      ['PATCH', `/api/posts/tag/${tagName}/rename/Renamed${runId}`],
-      ['DELETE', `/api/posts/tag/${tagName}`],
+      ['DELETE', `/api/posts/${publicId}/aliases/missing`],
+      ['PATCH', `/api/posts/${publicId}/aliases/old`],
+      ['PATCH', `/api/posts/tags/${tagName}`],
+      ['DELETE', `/api/posts/tags/${tagName}`],
     ])('is forbidden from privileged endpoint %s %s', async (method, path) => {
-      await request(app.getHttpServer())
+      const testRequest = request(app.getHttpServer())
         [method.toLowerCase() as 'get'](path)
-        .set('Authorization', `Bearer ${userToken}`)
-        .expect(403);
+        .set('Authorization', `Bearer ${userToken}`);
+      if (path.includes('/aliases/old')) {
+        testRequest.send({ alias: 'new' });
+      } else if (method === 'PATCH' && path.includes('/posts/tags/')) {
+        testRequest.send({ name: `Renamed${runId}` });
+      }
+      await testRequest.expect(403);
     });
 
     it('cannot create, update, or add an alias to an admin post', async () => {
@@ -186,7 +197,7 @@ describe('Guest and user API permissions (e2e)', () => {
         .send({ title: 'User update' })
         .expect(403);
       await request(app.getHttpServer())
-        .post(`/api/posts/${publicId}/alias`)
+        .post(`/api/posts/${publicId}/aliases`)
         .set('Authorization', `Bearer ${userToken}`)
         .send({ alias: `forbidden-${runId}` })
         .expect(403);

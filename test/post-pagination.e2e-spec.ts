@@ -163,7 +163,9 @@ describe('Post pagination (e2e)', () => {
 
   it('returns tag posts and pagination at consistent top-level fields', async () => {
     const response = await request(app.getHttpServer())
-      .get(`/api/posts/tag/${paginationTag.toLowerCase()}?page=1&pageSize=2`)
+      .get(
+        `/api/posts/tags/${paginationTag.toLowerCase()}/posts?page=1&pageSize=2`,
+      )
       .expect(200);
 
     expect(Array.isArray(response.body.data)).toBe(true);

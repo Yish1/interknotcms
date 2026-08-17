@@ -77,7 +77,7 @@ describe('Post alias management (e2e)', () => {
 
   it('creates and lists an alias', async () => {
     await request(app.getHttpServer())
-      .post(`/api/posts/${publicId}/alias`)
+      .post(`/api/posts/${publicId}/aliases`)
       .set('Authorization', `Bearer ${adminToken}`)
       .send({ alias: firstAlias })
       .expect(201);
@@ -92,10 +92,9 @@ describe('Post alias management (e2e)', () => {
 
   it('renames the alias and resolves the post through the new alias', async () => {
     const rename = await request(app.getHttpServer())
-      .patch(
-        `/api/posts/${publicId}/alias/${firstAlias}/rename/${renamedAlias}`,
-      )
+      .patch(`/api/posts/${publicId}/aliases/${firstAlias}`)
       .set('Authorization', `Bearer ${adminToken}`)
+      .send({ alias: renamedAlias })
       .expect(200);
 
     expect(rename.body.data.alias).toBe(renamedAlias);
@@ -108,25 +107,24 @@ describe('Post alias management (e2e)', () => {
     expect(aliases.body.data).not.toContain(firstAlias);
 
     await request(app.getHttpServer())
-      .get(`/api/posts/get/${renamedAlias}`)
+      .get(`/api/posts/${renamedAlias}`)
       .expect(200);
     await request(app.getHttpServer())
-      .get(`/api/posts/get/${firstAlias}`)
+      .get(`/api/posts/${firstAlias}`)
       .expect(404);
   });
 
   it('rejects renaming an alias to the same value', async () => {
     await request(app.getHttpServer())
-      .patch(
-        `/api/posts/${publicId}/alias/${renamedAlias}/rename/${renamedAlias}`,
-      )
+      .patch(`/api/posts/${publicId}/aliases/${renamedAlias}`)
       .set('Authorization', `Bearer ${adminToken}`)
+      .send({ alias: renamedAlias })
       .expect(400);
   });
 
   it('deletes the alias and then returns 404 for it', async () => {
     const deleted = await request(app.getHttpServer())
-      .delete(`/api/posts/${publicId}/alias/${renamedAlias}`)
+      .delete(`/api/posts/${publicId}/aliases/${renamedAlias}`)
       .set('Authorization', `Bearer ${adminToken}`)
       .expect(200);
     expect(deleted.body.data.alias).toBe(renamedAlias);
@@ -138,11 +136,11 @@ describe('Post alias management (e2e)', () => {
     expect(aliases.body.data).toEqual([]);
 
     await request(app.getHttpServer())
-      .delete(`/api/posts/${publicId}/alias/${renamedAlias}`)
+      .delete(`/api/posts/${publicId}/aliases/${renamedAlias}`)
       .set('Authorization', `Bearer ${adminToken}`)
       .expect(404);
     await request(app.getHttpServer())
-      .get(`/api/posts/get/${renamedAlias}`)
+      .get(`/api/posts/${renamedAlias}`)
       .expect(404);
   });
 });

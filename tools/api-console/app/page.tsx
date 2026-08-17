@@ -131,15 +131,16 @@ const endpoints: Endpoint[] = [
   {
     group: 'Posts',
     method: 'PATCH',
-    path: '/api/posts/tag/:oldTag/rename/:newTag',
+    path: '/api/posts/tags/:tag',
     name: 'Rename tag',
     auth: 'required',
     access: 'Admin only',
+    body: { name: 'NewTag' },
   },
   {
     group: 'Posts',
     method: 'DELETE',
-    path: '/api/posts/tag/:tag',
+    path: '/api/posts/tags/:tag',
     name: 'Delete tag',
     auth: 'required',
     access: 'Admin only',
@@ -155,7 +156,7 @@ const endpoints: Endpoint[] = [
   {
     group: 'Posts',
     method: 'GET',
-    path: '/api/posts/tag/DreamCMS?page=1&pageSize=10&sort=latest',
+    path: '/api/posts/tags/DreamCMS/posts?page=1&pageSize=10&sort=latest',
     name: 'List posts by tag',
     access: 'Public · published posts only',
   },
@@ -169,7 +170,7 @@ const endpoints: Endpoint[] = [
   {
     group: 'Posts',
     method: 'GET',
-    path: '/api/posts/get/:identifier',
+    path: '/api/posts/:identifier',
     name: 'Get post',
     auth: 'optional',
     access: 'Optional token · published public · draft author/admin',
@@ -191,7 +192,7 @@ const endpoints: Endpoint[] = [
   {
     group: 'Posts',
     method: 'POST',
-    path: '/api/posts/:identifier/alias',
+    path: '/api/posts/:identifier/aliases',
     name: 'Create alias',
     auth: 'required',
     access: 'Author or admin · alias cannot start with 0d',
@@ -208,15 +209,16 @@ const endpoints: Endpoint[] = [
   {
     group: 'Posts',
     method: 'PATCH',
-    path: '/api/posts/:identifier/alias/:oldAlias/rename/:newAlias',
+    path: '/api/posts/:identifier/aliases/:alias',
     name: 'Rename alias',
     auth: 'required',
     access: 'Owner editor or admin',
+    body: { alias: 'new-alias' },
   },
   {
     group: 'Posts',
     method: 'DELETE',
-    path: '/api/posts/:identifier/alias/:alias',
+    path: '/api/posts/:identifier/aliases/:alias',
     name: 'Delete alias',
     auth: 'required',
     access: 'Owner editor or admin',
@@ -687,7 +689,7 @@ export default function Home() {
         await check(
           'List posts by new test tag',
           'GET',
-          `/api/posts/tag/${encodeURIComponent(tagName)}?page=1&pageSize=5&sort=latest`,
+          `/api/posts/tags/${encodeURIComponent(tagName)}/posts?page=1&pageSize=5&sort=latest`,
           200,
         );
         const allTagsBeforeRename = await check(
@@ -713,14 +715,14 @@ export default function Home() {
         await check(
           'Rename tag',
           'PATCH',
-          `/api/posts/tag/${encodeURIComponent(tagName)}/rename/${encodeURIComponent(renamedTag)}`,
+          `/api/posts/tags/${encodeURIComponent(tagName)}`,
           200,
-          { auth: true },
+          { auth: true, body: { name: renamedTag } },
         );
         const renamedTagPosts = await check(
           'List posts by renamed tag',
           'GET',
-          `/api/posts/tag/${encodeURIComponent(renamedTag)}?page=1&pageSize=5&sort=latest`,
+          `/api/posts/tags/${encodeURIComponent(renamedTag)}/posts?page=1&pageSize=5&sort=latest`,
           200,
         );
         const renamedTagTotal =
@@ -736,7 +738,7 @@ export default function Home() {
         addResult({
           name: 'Renamed tag keeps its post relation',
           method: 'GET',
-          path: `/api/posts/tag/${renamedTag}`,
+          path: `/api/posts/tags/${renamedTag}/posts`,
           passed: typeof renamedTagTotal === 'number' && renamedTagTotal >= 1,
           detail: `Expected at least 1 post, received ${renamedTagTotal ?? 'unknown'}`,
           responseBody:
@@ -747,7 +749,7 @@ export default function Home() {
         await check(
           'Delete renamed tag',
           'DELETE',
-          `/api/posts/tag/${encodeURIComponent(renamedTag)}`,
+          `/api/posts/tags/${encodeURIComponent(renamedTag)}`,
           200,
           { auth: true },
         );
@@ -776,7 +778,7 @@ export default function Home() {
         const deletedTagPosts = await check(
           'Deleted tag has no posts',
           'GET',
-          `/api/posts/tag/${encodeURIComponent(renamedTag)}?page=1&pageSize=5&sort=latest`,
+          `/api/posts/tags/${encodeURIComponent(renamedTag)}/posts?page=1&pageSize=5&sort=latest`,
           200,
         );
         const deletedTagTotal =
@@ -792,7 +794,7 @@ export default function Home() {
         addResult({
           name: 'Deleting tag removes post relations',
           method: 'GET',
-          path: `/api/posts/tag/${renamedTag}`,
+          path: `/api/posts/tags/${renamedTag}/posts`,
           passed: deletedTagTotal === 0,
           detail: `Expected 0 posts, received ${deletedTagTotal ?? 'unknown'}`,
           responseBody:
@@ -844,14 +846,14 @@ export default function Home() {
         await check(
           'Get post with token',
           'GET',
-          `/api/posts/get/${publicId}`,
+          `/api/posts/${publicId}`,
           200,
           { auth: true },
         );
         await check(
           'Create post alias',
           'POST',
-          `/api/posts/${publicId}/alias`,
+          `/api/posts/${publicId}/aliases`,
           201,
           {
             auth: true,
@@ -868,33 +870,33 @@ export default function Home() {
         await check(
           'Rename post alias',
           'PATCH',
-          `/api/posts/${publicId}/alias/${alias}/rename/${renamedAlias}`,
+          `/api/posts/${publicId}/aliases/${alias}`,
           200,
-          { auth: true },
+          { auth: true, body: { alias: renamedAlias } },
         );
         await check(
           'Get post through renamed alias',
           'GET',
-          `/api/posts/get/${renamedAlias}`,
+          `/api/posts/${renamedAlias}`,
           200,
         );
         await check(
           'Delete post alias',
           'DELETE',
-          `/api/posts/${publicId}/alias/${renamedAlias}`,
+          `/api/posts/${publicId}/aliases/${renamedAlias}`,
           200,
           { auth: true },
         );
         await check(
           'Deleted alias is no longer available',
           'GET',
-          `/api/posts/get/${renamedAlias}`,
+          `/api/posts/${renamedAlias}`,
           404,
         );
         await check(
           'List posts by tag',
           'GET',
-          '/api/posts/tag/DreamCMS?page=1&pageSize=5&sort=latest',
+          '/api/posts/tags/DreamCMS/posts?page=1&pageSize=5&sort=latest',
           200,
         );
         await check(
@@ -914,7 +916,7 @@ export default function Home() {
         const restoredPost = await check(
           'Read restored post',
           'GET',
-          `/api/posts/get/${publicId}`,
+          `/api/posts/${publicId}`,
           200,
           { auth: true },
         );
@@ -931,7 +933,7 @@ export default function Home() {
         addResult({
           name: 'Restore preserves publishedAt',
           method: 'GET',
-          path: `/api/posts/get/${publicId}`,
+          path: `/api/posts/${publicId}`,
           passed:
             Boolean(restoredPublishedAt) &&
             publishedAtAfterRestore === restoredPublishedAt,
@@ -973,7 +975,7 @@ export default function Home() {
         addResult({
           name: 'Post read and alias tests',
           method: '—',
-          path: '/api/posts/get/:identifier',
+          path: '/api/posts/:identifier',
           passed: false,
           detail:
             'Post creation did not return a publicId; dependent tests were skipped.',
@@ -1865,13 +1867,13 @@ export default function Home() {
       await check(
         'Guest can read published post',
         'GET',
-        `/api/posts/get/${publicId}`,
+        `/api/posts/${publicId}`,
         200,
       );
       await check(
         'User can read published post',
         'GET',
-        `/api/posts/get/${publicId}`,
+        `/api/posts/${publicId}`,
         200,
         { token: userToken },
       );
@@ -1881,7 +1883,7 @@ export default function Home() {
       await check(
         'Guest can list posts by tag',
         'GET',
-        `/api/posts/tag/${permissionTag}`,
+        `/api/posts/tags/${permissionTag}/posts`,
         200,
       );
 
@@ -1911,7 +1913,7 @@ export default function Home() {
         {
           name: 'create aliases',
           method: 'POST',
-          path: `/api/posts/${publicId}/alias`,
+          path: `/api/posts/${publicId}/aliases`,
           body: { alias: forbiddenAlias },
         },
         {
@@ -1922,12 +1924,13 @@ export default function Home() {
         {
           name: 'rename aliases',
           method: 'PATCH',
-          path: `/api/posts/${publicId}/alias/old/rename/new`,
+          path: `/api/posts/${publicId}/aliases/old`,
+          body: { alias: 'new' },
         },
         {
           name: 'delete aliases',
           method: 'DELETE',
-          path: `/api/posts/${publicId}/alias/old`,
+          path: `/api/posts/${publicId}/aliases/old`,
         },
         {
           name: 'trash posts',
@@ -1947,12 +1950,13 @@ export default function Home() {
         {
           name: 'rename tags',
           method: 'PATCH',
-          path: `/api/posts/tag/${permissionTag}/rename/${renamedPermissionTag}`,
+          path: `/api/posts/tags/${permissionTag}`,
+          body: { name: renamedPermissionTag },
         },
         {
           name: 'delete tags',
           method: 'DELETE',
-          path: `/api/posts/tag/${permissionTag}`,
+          path: `/api/posts/tags/${permissionTag}`,
         },
       ];
 
@@ -1969,7 +1973,7 @@ export default function Home() {
       await check(
         'Admin deletes permission test tag',
         'DELETE',
-        `/api/posts/tag/${permissionTag}`,
+        `/api/posts/tags/${permissionTag}`,
         200,
         { token: adminToken },
       );

@@ -20,12 +20,15 @@ import { ManagePostQueryDto } from './dto/post-list-query-manage.dto.js';
 import { UpdatePostDto } from './dto/update-post.dto.js';
 import { Throttle } from '@nestjs/throttler';
 import { LogThrottlerGuard } from '../../common/guards/log-throttler.guard.js';
+import { RenameTagDto } from './dto/rename-tag.dto.js';
+import { ApiBearerAuth } from '@nestjs/swagger';
 
 @Controller('posts')
 export class PostsController {
   constructor(private readonly postsService: PostsService) {}
 
   @UseGuards(AuthGuard, LogThrottlerGuard)
+  @ApiBearerAuth('access-token')
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post()
   async create(@Body() createPostDto: CreatePostDto, @Req() req: any) {
@@ -36,19 +39,10 @@ export class PostsController {
     };
   }
 
-  @UseGuards(OptionalAuthGuard)
-  @Get('get/:identifier')
-  async findOne(@Param('identifier') identifier: string, @Req() req: any) {
-    const post = await this.postsService.findOne(identifier, req.user);
-    return {
-      message: 'Post retrieved successfully',
-      data: post,
-    };
-  }
-
   @UseGuards(AuthGuard, LogThrottlerGuard)
+  @ApiBearerAuth('access-token')
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
-  @Post(':identifier/alias')
+  @Post(':identifier/aliases')
   async createPostAlias(
     @Param('identifier') identifier: string,
     @Body() createPostAliasDto: CreatePostAliasDto,
@@ -76,6 +70,7 @@ export class PostsController {
   }
 
   @UseGuards(AuthGuard)
+  @ApiBearerAuth('access-token')
   @Get('manage') //
   async listManagePosts(@Req() req: any, @Query() query: ManagePostQueryDto) {
     const result = await this.postsService.listManagePosts(query, req.user);
@@ -87,7 +82,7 @@ export class PostsController {
     };
   }
 
-  @Get('tag/:tag') // api/posts/tag/:tag?page=x&pageSize=xx&sort=latest or views
+  @Get('tags/:tag/posts')
   async listPostsByTag(
     @Param('tag') tag: string,
     @Query() query: PostListQueryDto,
@@ -101,6 +96,7 @@ export class PostsController {
   }
 
   @UseGuards(AuthGuard)
+  @ApiBearerAuth('access-token')
   @Delete(':identifier')
   async deletePost(@Param('identifier') identifier: string, @Req() req: any) {
     const post = await this.postsService.deletePost(identifier, req.user);
@@ -111,6 +107,7 @@ export class PostsController {
   }
 
   @UseGuards(AuthGuard)
+  @ApiBearerAuth('access-token')
   @Patch(':identifier/restore')
   async restorePost(@Param('identifier') identifier: string, @Req() req: any) {
     const post = await this.postsService.restorePost(identifier, req.user);
@@ -121,6 +118,7 @@ export class PostsController {
   }
 
   @UseGuards(AuthGuard)
+  @ApiBearerAuth('access-token')
   @Delete(':identifier/permanent')
   async deletePostPermanently(
     @Param('identifier') identifier: string,
@@ -137,6 +135,7 @@ export class PostsController {
   }
 
   @UseGuards(AuthGuard)
+  @ApiBearerAuth('access-token')
   @Patch(':identifier')
   async updatePost(
     @Param('identifier') identifier: string,
@@ -155,7 +154,8 @@ export class PostsController {
   }
 
   @UseGuards(AuthGuard)
-  @Delete(':identifier/alias/:alias')
+  @ApiBearerAuth('access-token')
+  @Delete(':identifier/aliases/:alias')
   async deletePostAlias(
     @Param('identifier') identifier: string,
     @Param('alias') alias: string,
@@ -173,17 +173,18 @@ export class PostsController {
   }
 
   @UseGuards(AuthGuard)
-  @Patch(':identifier/alias/:oldAlias/rename/:newAlias')
+  @ApiBearerAuth('access-token')
+  @Patch(':identifier/aliases/:alias')
   async renamePostAlias(
     @Param('identifier') identifier: string,
-    @Param('oldAlias') oldAlias: string,
-    @Param('newAlias') newAlias: string,
+    @Param('alias') oldAlias: string,
+    @Body() updatePostAliasDto: CreatePostAliasDto,
     @Req() req: any,
   ) {
     const post = await this.postsService.renamePostAlias(
       identifier,
       oldAlias,
-      newAlias,
+      updatePostAliasDto.alias,
       req.user,
     );
     return {
@@ -193,6 +194,7 @@ export class PostsController {
   }
 
   @UseGuards(AuthGuard)
+  @ApiBearerAuth('access-token')
   @Get(':identifier/aliases')
   async listPostAliases(
     @Param('identifier') identifier: string,
@@ -209,13 +211,18 @@ export class PostsController {
   }
 
   @UseGuards(AuthGuard)
-  @Patch('tag/:oldTag/rename/:newTag')
+  @ApiBearerAuth('access-token')
+  @Patch('tags/:tag')
   async renameTag(
-    @Param('oldTag') oldTag: string,
-    @Param('newTag') newTag: string,
+    @Param('tag') tag: string,
+    @Body() renameTagDto: RenameTagDto,
     @Req() req: any,
   ) {
-    const result = await this.postsService.renameTag(oldTag, newTag, req.user);
+    const result = await this.postsService.renameTag(
+      tag,
+      renameTagDto.name,
+      req.user,
+    );
     return {
       message: 'Tag renamed successfully',
       data: result,
@@ -223,7 +230,8 @@ export class PostsController {
   }
 
   @UseGuards(AuthGuard)
-  @Delete('tag/:tag')
+  @ApiBearerAuth('access-token')
+  @Delete('tags/:tag')
   async deleteTag(@Param('tag') tag: string, @Req() req: any) {
     const result = await this.postsService.deleteTag(tag, req.user);
     return {
@@ -238,6 +246,17 @@ export class PostsController {
     return {
       message: 'All tags retrieved successfully',
       data: tags,
+    };
+  }
+
+  @UseGuards(OptionalAuthGuard)
+  @ApiBearerAuth('access-token')
+  @Get(':identifier')
+  async findOne(@Param('identifier') identifier: string, @Req() req: any) {
+    const post = await this.postsService.findOne(identifier, req.user);
+    return {
+      message: 'Post retrieved successfully',
+      data: post,
     };
   }
 }

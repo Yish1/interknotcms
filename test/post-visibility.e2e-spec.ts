@@ -134,7 +134,7 @@ describe('Post visibility (e2e)', () => {
 
   it('allows a guest to read a published post', async () => {
     const response = await request(app.getHttpServer())
-      .get(`/api/posts/get/${publishedPublicId}`)
+      .get(`/api/posts/${publishedPublicId}`)
       .expect(200);
 
     expect(response.body.data.status).toBe('published');
@@ -142,13 +142,13 @@ describe('Post visibility (e2e)', () => {
 
   it('hides a draft from a guest', async () => {
     await request(app.getHttpServer())
-      .get(`/api/posts/get/${draftPublicId}`)
+      .get(`/api/posts/${draftPublicId}`)
       .expect(404);
   });
 
   it('allows the author to read their draft', async () => {
     const response = await request(app.getHttpServer())
-      .get(`/api/posts/get/${draftPublicId}`)
+      .get(`/api/posts/${draftPublicId}`)
       .set('Authorization', `Bearer ${authorToken}`)
       .expect(200);
 
@@ -158,14 +158,14 @@ describe('Post visibility (e2e)', () => {
 
   it('hides a draft from another user', async () => {
     await request(app.getHttpServer())
-      .get(`/api/posts/get/${draftPublicId}`)
+      .get(`/api/posts/${draftPublicId}`)
       .set('Authorization', `Bearer ${otherUserToken}`)
       .expect(404);
   });
 
   it('allows an admin to read any draft', async () => {
     const response = await request(app.getHttpServer())
-      .get(`/api/posts/get/${draftPublicId}`)
+      .get(`/api/posts/${draftPublicId}`)
       .set('Authorization', `Bearer ${adminToken}`)
       .expect(200);
 
@@ -174,18 +174,18 @@ describe('Post visibility (e2e)', () => {
 
   it('applies the same draft rules when accessed through an alias', async () => {
     await request(app.getHttpServer())
-      .get(`/api/posts/get/${draftAlias}`)
+      .get(`/api/posts/${draftAlias}`)
       .expect(404);
 
     await request(app.getHttpServer())
-      .get(`/api/posts/get/${draftAlias}`)
+      .get(`/api/posts/${draftAlias}`)
       .set('Authorization', `Bearer ${authorToken}`)
       .expect(200);
   });
 
   it('rejects an invalid optional token instead of treating it as a guest', async () => {
     await request(app.getHttpServer())
-      .get(`/api/posts/get/${publishedPublicId}`)
+      .get(`/api/posts/${publishedPublicId}`)
       .set('Authorization', 'Bearer invalid-token')
       .expect(401);
   });
@@ -201,7 +201,7 @@ describe('Post visibility (e2e)', () => {
       .set('Authorization', `Bearer ${staleToken}`)
       .expect(401);
     await request(app.getHttpServer())
-      .get(`/api/posts/get/${publishedPublicId}`)
+      .get(`/api/posts/${publishedPublicId}`)
       .set('Authorization', `Bearer ${staleToken}`)
       .expect(401);
   });
@@ -217,7 +217,7 @@ describe('Post visibility (e2e)', () => {
       .set('Authorization', `Bearer ${authorToken}`)
       .expect(401);
     await request(app.getHttpServer())
-      .get(`/api/posts/get/${publishedPublicId}`)
+      .get(`/api/posts/${publishedPublicId}`)
       .set('Authorization', `Bearer ${authorToken}`)
       .expect(401);
 
@@ -238,7 +238,7 @@ describe('Post visibility (e2e)', () => {
       .set('Authorization', `Bearer ${authorToken}`)
       .expect(401);
     await request(app.getHttpServer())
-      .get(`/api/posts/get/${publishedPublicId}`)
+      .get(`/api/posts/${publishedPublicId}`)
       .set('Authorization', `Bearer ${authorToken}`)
       .expect(401);
 

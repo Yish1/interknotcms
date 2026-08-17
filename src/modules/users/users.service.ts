@@ -10,14 +10,10 @@ import { CreateUserDto } from './dto/create-user.dto.js';
 import { UpdateUserDto } from './dto/update-user.dto.js';
 import * as argon2 from 'argon2';
 import { Prisma } from '../../generated/prisma/client.js';
-import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class UsersService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly config: ConfigService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   private readonly privateUserSelect = {
     id: true,
@@ -82,9 +78,14 @@ export class UsersService {
     createUserDto: CreateUserDto,
     currentUser?: { sub: string; role: string },
   ) {
-    const registrationMode = this.config.getOrThrow<'OPEN' | 'ADMIN_ONLY'>(
-      'REGISTRATION_MODE',
-    );
+    const registrationOption = await this.prisma.option.findUnique({
+      where: { key: 'registration_mode' },
+      select: { value: true },
+    });
+
+    // 配置缺失或值不合法时采用更安全的 ADMIN_ONLY 模式。
+    const registrationMode =
+      registrationOption?.value === 'OPEN' ? 'OPEN' : 'ADMIN_ONLY';
 
     if (
       registrationMode !== 'OPEN' &&
@@ -254,22 +255,19 @@ export class UsersService {
         deletedAt: new Date(),
         authVersion: { increment: 1 }, // 删除用户时增加authVersion，使其所有现有token失效
       },
-      select: { 
+      select: {
         ...this.publicUserSelect,
         deletedAt: true,
       },
-
     });
   }
-
 
   async restoreUser(
     username: string,
     currentUser: { sub: string; role: string; username: string },
   ) {
-
-    if (currentUser.role !== 'admin') 
-        // 只有管理员可以恢复用户
+    if (currentUser.role !== 'admin')
+    // 只有管理员可以恢复用户
     {
       throw new ForbiddenException('Permission denied');
     }
@@ -304,7 +302,6 @@ export class UsersService {
     username: string,
     currentUser: { sub: string; role: string; username: string },
   ) {
-
     const user = await this.prisma.user.findUnique({
       where: {
         username,
@@ -320,7 +317,6 @@ export class UsersService {
       throw new ForbiddenException('Permission denied');
     }
 
-
     if (!user) {
       throw new NotFoundException('User not found or already disabled');
     }
@@ -333,7 +329,7 @@ export class UsersService {
         isActive: false,
         authVersion: { increment: 1 }, // 禁用用户时增加authVersion，使其所有现有token失效
       },
-      select: { 
+      select: {
         ...this.publicUserSelect,
         isActive: true,
       },
@@ -347,34 +343,31 @@ export class UsersService {
     if (currentUser.role !== 'admin') {
       throw new ForbiddenException('Permission denied');
     }
-  
+
     const user = await this.prisma.user.findUnique({
-        where: {
-            username,
-            deletedAt: null,
-            isActive: false,
-        },
+      where: {
+        username,
+        deletedAt: null,
+        isActive: false,
+      },
     });
-  
+
     if (!user) {
-        throw new NotFoundException('User not found or already enabled');
+      throw new NotFoundException('User not found or already enabled');
     }
-  
+
     return await this.prisma.user.update({
-        where: {
-            username,
-        },
-        data: {
-            isActive: true,
-            authVersion: { increment: 1 }, // 启用用户时增加authVersion，使其所有现有token失效
-        },
-        select: { 
-            ...this.publicUserSelect,
-            isActive: true,
-        },
+      where: {
+        username,
+      },
+      data: {
+        isActive: true,
+        authVersion: { increment: 1 }, // 启用用户时增加authVersion，使其所有现有token失效
+      },
+      select: {
+        ...this.publicUserSelect,
+        isActive: true,
+      },
     });
   }
-
 }
-    
-

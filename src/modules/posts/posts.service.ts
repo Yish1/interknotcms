@@ -15,7 +15,7 @@ import { UpdatePostDto } from './dto/update-post.dto.js';
 
 @Injectable()
 export class PostsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   private deduplicateTags(tags: string[]): string[] {
     const seen = new Set<string>();
@@ -110,15 +110,15 @@ export class PostsService {
         },
         tags: uniqueTags.length
           ? {
-              create: uniqueTags.map((tag) => ({
-                tag: {
-                  connectOrCreate: {
-                    where: { name: tag },
-                    create: { name: tag },
-                  },
+            create: uniqueTags.map((tag) => ({
+              tag: {
+                connectOrCreate: {
+                  where: { name: tag },
+                  create: { name: tag },
                 },
-              })),
-            }
+              },
+            })),
+          }
           : undefined, // 如果有标签就关联标签，否则不关联
       },
     });
@@ -741,26 +741,26 @@ export class PostsService {
 
         ...(authorId
           ? {
-              author: {
-                connect: { id: authorId },
-              },
-            }
+            author: {
+              connect: { id: authorId },
+            },
+          }
           : {}),
 
         ...(uniqueTags !== undefined
           ? {
-              tags: {
-                deleteMany: {},
-                create: uniqueTags.map((tag) => ({
-                  tag: {
-                    connectOrCreate: {
-                      where: { name: tag },
-                      create: { name: tag },
-                    },
+            tags: {
+              deleteMany: {},
+              create: uniqueTags.map((tag) => ({
+                tag: {
+                  connectOrCreate: {
+                    where: { name: tag },
+                    create: { name: tag },
                   },
-                })),
-              },
-            }
+                },
+              })),
+            },
+          }
           : {}),
       },
 

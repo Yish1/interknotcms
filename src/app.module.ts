@@ -15,27 +15,18 @@ import { RequestLoggerMiddleware } from './common/middleware/request-logger.midd
 // import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { CommentsModule } from './modules/comments/comments.module.js';
-
-function validateEnvironment(config: Record<string, unknown>) {
-  const registrationMode = config.REGISTRATION_MODE;
-
-  if (registrationMode !== 'OPEN' && registrationMode !== 'ADMIN_ONLY') {
-    throw new Error('REGISTRATION_MODE must be either "OPEN" or "ADMIN_ONLY"');
-  }
-
-  return config;
-}
+import { OptionsModule } from './modules/options/options.module.js';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      validate: validateEnvironment,
     }),
     PrismaModule,
     UsersModule,
     AuthModule,
     PostsModule,
+    OptionsModule,
     ThrottlerModule.forRoot([
       {
         ttl: 60_000,

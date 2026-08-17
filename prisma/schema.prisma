@@ -156,7 +156,7 @@ enum CommentStatus {
 }
 
 model Option {
-  key       String   @id @db.VarChar(100)
+  key       String   @id @db.Citext
   value     Json
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 

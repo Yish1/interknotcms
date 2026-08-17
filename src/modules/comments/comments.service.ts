@@ -99,6 +99,7 @@ export class CommentsService {
         parentId: true,
         user: {
           select: {
+            id: true,
             username: true,
             avatar: true,
           },
@@ -358,4 +359,58 @@ export class CommentsService {
       },
     });
   }
+
+  async restoreComment(
+    commentId: string,
+    currentUser: { sub: string; role: string },
+  ){
+    const comment = await this.prisma.comment.findFirst({
+      where: {
+        id: commentId,
+        deletedAt: { not: null },
+      },
+      select: {
+        id: true,
+        userId: true,
+        post: {
+          select: {
+            authorId: true,
+          },
+        },
+      },
+    });
+
+    if (!comment) {
+      throw new NotFoundException('Comment not found or not deleted');
+    }
+
+    const canRestore =
+      currentUser.role === 'admin' ||
+      comment.userId === currentUser.sub ||
+      (currentUser.role === 'editor' &&
+        comment.post.authorId === currentUser.sub);
+
+    if (!canRestore) {
+      throw new ForbiddenException('Permission denied');
+    }
+
+    return this.prisma.comment.update({
+      where: { id: commentId },
+      data: { deletedAt: null },
+      select: {
+        id: true,
+        content: true,
+        status: true,
+        createdAt: true,
+        deletedAt: true,
+        user: {
+          select: {
+            username: true,
+          },
+        },
+      },
+    });
+  }
+
+
 }

@@ -8,6 +8,7 @@ import {
   Delete,
   UseGuards,
   Req,
+  Query,
 } from '@nestjs/common';
 import { UsersService } from './users.service.js';
 import { CreateUserDto } from './dto/create-user.dto.js';
@@ -17,6 +18,7 @@ import { OptionalAuthGuard } from '../auth/optional-auth.guard.js';
 import { Throttle } from '@nestjs/throttler';
 import { LogThrottlerGuard } from '../../common/guards/log-throttler.guard.js';
 import { ApiBearerAuth } from '@nestjs/swagger';
+import { UserListQueryDto } from './dto/user-list-query.dto.js';
 
 @Controller('users')
 export class UsersController {
@@ -25,11 +27,13 @@ export class UsersController {
   @Get()
   @UseGuards(AuthGuard)
   @ApiBearerAuth('access-token')
-  async findAll(@Req() req: any) {
-    const users = await this.usersService.findAll(req.user);
+  async findAll(@Query() query: UserListQueryDto, @Req() req: any) {
+    const result = await this.usersService.findAll(query, req.user);
 
     return {
-      data: users,
+      message: 'Users retrieved successfully',
+      data: result.users,
+      pagination: result.pagination,
     };
   }
 

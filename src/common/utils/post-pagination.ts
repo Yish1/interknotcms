@@ -27,10 +27,10 @@ export function getPostPagination(
 } {
   const orderBy: Prisma.PostOrderByWithRelationInput[] =
     sort === 'views'
-      ? [{ viewCount: 'desc' }, { updatedAt: 'desc' }]
+      ? [{ viewCount: 'desc' }, { updatedAt: 'desc' }, { id: 'desc' }]
       : sort === 'updated'
-        ? [{ updatedAt: 'desc' }]
-        : [{ publishedAt: 'desc' }, { updatedAt: 'desc' }];
+        ? [{ updatedAt: 'desc' }, { id: 'desc' }]
+        : [{ publishedAt: 'desc' }, { updatedAt: 'desc' }, { id: 'desc' }];
 
   return {
     ...getPagination(page, pageSize),

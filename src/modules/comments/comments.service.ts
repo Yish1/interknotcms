@@ -12,7 +12,7 @@ import {
   getPagination,
 } from '../../common/utils/post-pagination.js';
 
-const MAX_COMMENT_DEPTH = 50;
+const DEFAULT_MAX_COMMENT_DEPTH = 50;
 
 export interface PublicCommentNode {
   id: string;
@@ -59,18 +59,37 @@ export class CommentsService {
     const { parentId, content } = createCommentDto;
 
     if (parentId) {
-      const parentComment = await this.prisma.comment.findFirst({
-        where: {
-          id: parentId,
-          postId: post.id,
-          status: 'approved',
-          deletedAt: null,
-        },
-      });
+      const [parentComment, maxDepthOption] = await Promise.all([
+        this.prisma.comment.findFirst({
+          where: {
+            id: parentId,
+            postId: post.id,
+            status: 'approved',
+            deletedAt: null,
+          },
+        }),
+        this.prisma.option.upsert({
+          where: { key: 'max_comment_depth' },
+          update: {},
+          create: {
+            key: 'max_comment_depth',
+            value: DEFAULT_MAX_COMMENT_DEPTH,
+          },
+          select: { value: true },
+        }),
+      ]);
 
       if (!parentComment || parentComment.postId !== post.id) {
         throw new BadRequestException('Invalid parent comment');
       }
+
+      const configuredMaxDepth = maxDepthOption?.value;
+      const maxCommentDepth =
+        typeof configuredMaxDepth === 'number' &&
+        Number.isSafeInteger(configuredMaxDepth) &&
+        configuredMaxDepth > 0
+          ? configuredMaxDepth
+          : DEFAULT_MAX_COMMENT_DEPTH;
 
       const [depthResult] = await this.prisma.$queryRaw<
         Array<{ depth: number }>
@@ -86,28 +105,30 @@ export class CommentsService {
           FROM comments AS parent
           INNER JOIN comment_ancestors AS child
             ON parent.id = child.parent_id
-          WHERE child.depth < ${MAX_COMMENT_DEPTH}
+          WHERE child.depth < ${maxCommentDepth}
         )
         SELECT COALESCE(MAX(depth), 0)::int AS depth
         FROM comment_ancestors
       `;
 
-      if (depthResult.depth >= MAX_COMMENT_DEPTH) {
+      if (depthResult.depth >= maxCommentDepth) {
         throw new BadRequestException(
-          `Comment nesting cannot exceed ${MAX_COMMENT_DEPTH} levels`,
+          `Comment nesting cannot exceed ${maxCommentDepth} levels`,
         );
       }
     }
 
-    const reviewOption = await this.prisma.option.findFirst({
+    const reviewOption = await this.prisma.option.upsert({
       where: { key: 'comment_review_required' },
+      update: {},
+      create: { key: 'comment_review_required', value: true },
       select: { value: true },
     });
 
     const needapprove =
       currentUser.role === 'admin' ||
       (currentUser.role === 'editor' && currentUser.sub === post.authorId);
-    // 只接受 JSON 布尔值；配置缺失或类型错误时默认需要审批。
+    // 只接受 JSON 布尔值；类型错误时默认需要审批。
     const reviewRequired = reviewOption?.value !== false;
     const commentStatus =
       reviewRequired && !needapprove ? 'pending' : 'approved';
@@ -253,41 +274,54 @@ export class CommentsService {
     };
   }
 
-  async listPendingComments(currentUser: { sub: string; role: string }) {
+  async listPendingComments(
+    query: CommentListQueryDto,
+    currentUser: { sub: string; role: string },
+  ) {
     if (currentUser.role !== 'admin' && currentUser.role !== 'editor') {
       throw new ForbiddenException('Permission denied');
     }
 
-    return await this.prisma.comment.findMany({
-      where: {
-        status: 'pending',
-        deletedAt: null,
-        ...(currentUser.role === 'admin' // admin能看所有待审核评论，editor只能看自己文章的评论
-          ? {}
-          : { post: { authorId: currentUser.sub } }),
-      },
-      orderBy: {
-        createdAt: 'asc',
-      },
-      select: {
-        id: true,
-        content: true,
-        status: true,
-        createdAt: true,
-        parentId: true,
-        post: {
-          select: {
-            publicId: true,
-            title: true,
+    const { page, pageSize } = query;
+    const where = {
+      status: 'pending' as const,
+      deletedAt: null,
+      ...(currentUser.role === 'admin'
+        ? {}
+        : { post: { authorId: currentUser.sub } }),
+    };
+
+    const [comments, total] = await Promise.all([
+      this.prisma.comment.findMany({
+        where,
+        ...getPagination(page, pageSize),
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+        select: {
+          id: true,
+          content: true,
+          status: true,
+          createdAt: true,
+          parentId: true,
+          post: {
+            select: {
+              publicId: true,
+              title: true,
+            },
+          },
+          user: {
+            select: {
+              username: true,
+            },
           },
         },
-        user: {
-          select: {
-            username: true,
-          },
-        },
-      },
-    });
+      }),
+      this.prisma.comment.count({ where }),
+    ]);
+
+    return {
+      comments,
+      pagination: createPaginationMeta(page, pageSize, total),
+    };
   }
 
   async approveComment(

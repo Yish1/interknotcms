@@ -245,57 +245,97 @@ describe('Comments (e2e)', () => {
   });
 
   it('applies review rules to users, owner editors, and other editors', async () => {
-    const userComment = await request(app.getHttpServer())
-      .post(`/api/comments/post/${ownerPublicId}`)
-      .set('Authorization', `Bearer ${userToken}`)
-      .send({ content: 'User pending comment' })
-      .expect(201);
-    expect(userComment.body.data.status).toBe('pending');
+    const originalOption = await prisma.option.findUnique({
+      where: { key: 'comment_review_required' },
+    });
 
-    const ownerComment = await request(app.getHttpServer())
-      .post(`/api/comments/post/${ownerPublicId}`)
-      .set('Authorization', `Bearer ${ownerToken}`)
-      .send({ content: 'Owner editor approved comment' })
-      .expect(201);
-    expect(ownerComment.body.data.status).toBe('approved');
+    await prisma.option.deleteMany({
+      where: { key: 'comment_review_required' },
+    });
 
-    const otherEditorComment = await request(app.getHttpServer())
-      .post(`/api/comments/post/${ownerPublicId}`)
-      .set('Authorization', `Bearer ${otherEditorToken}`)
-      .send({ content: 'Other editor pending comment' })
-      .expect(201);
-    expect(otherEditorComment.body.data.status).toBe('pending');
+    try {
+      const userComment = await request(app.getHttpServer())
+        .post(`/api/comments/post/${ownerPublicId}`)
+        .set('Authorization', `Bearer ${userToken}`)
+        .send({ content: 'User pending comment' })
+        .expect(201);
+      expect(userComment.body.data.status).toBe('pending');
 
-    const ownerPending = await request(app.getHttpServer())
-      .get('/api/comments/pending')
-      .set('Authorization', `Bearer ${ownerToken}`)
-      .expect(200);
-    expect(ownerPending.body.data).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ id: userComment.body.data.id }),
-        expect.objectContaining({ id: otherEditorComment.body.data.id }),
-      ]),
-    );
+      const ownerComment = await request(app.getHttpServer())
+        .post(`/api/comments/post/${ownerPublicId}`)
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .send({ content: 'Owner editor approved comment' })
+        .expect(201);
+      expect(ownerComment.body.data.status).toBe('approved');
 
-    const otherPending = await request(app.getHttpServer())
-      .get('/api/comments/pending')
-      .set('Authorization', `Bearer ${otherEditorToken}`)
-      .expect(200);
-    expect(otherPending.body.data).not.toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ id: userComment.body.data.id }),
-      ]),
-    );
+      const otherEditorComment = await request(app.getHttpServer())
+        .post(`/api/comments/post/${ownerPublicId}`)
+        .set('Authorization', `Bearer ${otherEditorToken}`)
+        .send({ content: 'Other editor pending comment' })
+        .expect(201);
+      expect(otherEditorComment.body.data.status).toBe('pending');
 
-    await request(app.getHttpServer())
-      .post(`/api/comments/approve/${userComment.body.data.id}`)
-      .set('Authorization', `Bearer ${otherEditorToken}`)
-      .expect(404);
+      const ownerPending = await request(app.getHttpServer())
+        .get('/api/comments/pending')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .expect(200);
+      expect(ownerPending.body.data).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ id: userComment.body.data.id }),
+          expect.objectContaining({ id: otherEditorComment.body.data.id }),
+        ]),
+      );
+      expect(ownerPending.body.pagination).toEqual({
+        page: 1,
+        pageSize: 10,
+        total: 2,
+        totalPages: 1,
+      });
 
-    await request(app.getHttpServer())
-      .post(`/api/comments/approve/${userComment.body.data.id}`)
-      .set('Authorization', `Bearer ${ownerToken}`)
-      .expect(201);
+      const otherPending = await request(app.getHttpServer())
+        .get('/api/comments/pending')
+        .set('Authorization', `Bearer ${otherEditorToken}`)
+        .expect(200);
+      expect(otherPending.body.data).not.toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ id: userComment.body.data.id }),
+        ]),
+      );
+      expect(otherPending.body.pagination).toEqual({
+        page: 1,
+        pageSize: 10,
+        total: 0,
+        totalPages: 0,
+      });
+
+      await request(app.getHttpServer())
+        .post(`/api/comments/approve/${userComment.body.data.id}`)
+        .set('Authorization', `Bearer ${otherEditorToken}`)
+        .expect(404);
+
+      await request(app.getHttpServer())
+        .post(`/api/comments/approve/${userComment.body.data.id}`)
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .expect(201);
+
+      await expect(
+        prisma.option.findUnique({
+          where: { key: 'comment_review_required' },
+          select: { value: true },
+        }),
+      ).resolves.toEqual({ value: true });
+    } finally {
+      if (originalOption) {
+        await prisma.option.update({
+          where: { key: 'comment_review_required' },
+          data: { value: originalOption.value },
+        });
+      } else {
+        await prisma.option.deleteMany({
+          where: { key: 'comment_review_required' },
+        });
+      }
+    }
   });
 
   it('rejects invalid, cross-post, and unapproved parent comments', async () => {
@@ -334,6 +374,57 @@ describe('Comments (e2e)', () => {
       .set('Authorization', `Bearer ${userToken}`)
       .send({ content: 'Reply to pending parent', parentId: pendingParent.id })
       .expect(400);
+  });
+
+  it('reads the maximum comment depth from options', async () => {
+    const originalOption = await prisma.option.findUnique({
+      where: { key: 'max_comment_depth' },
+    });
+
+    await prisma.option.deleteMany({
+      where: { key: 'max_comment_depth' },
+    });
+
+    try {
+      await request(app.getHttpServer())
+        .post(`/api/comments/post/${ownerPublicId}`)
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .send({ content: 'Allowed level 2 reply', parentId: rootId })
+        .expect(201);
+
+      await expect(
+        prisma.option.findUnique({
+          where: { key: 'max_comment_depth' },
+          select: { value: true },
+        }),
+      ).resolves.toEqual({ value: 50 });
+
+      await prisma.option.update({
+        where: { key: 'max_comment_depth' },
+        data: { value: 2 },
+      });
+
+      const response = await request(app.getHttpServer())
+        .post(`/api/comments/post/${ownerPublicId}`)
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .send({ content: 'Rejected level 3 reply', parentId: firstReplyId })
+        .expect(400);
+
+      expect(response.body.message).toBe(
+        'Comment nesting cannot exceed 2 levels',
+      );
+    } finally {
+      if (originalOption) {
+        await prisma.option.update({
+          where: { key: 'max_comment_depth' },
+          data: { value: originalOption.value },
+        });
+      } else {
+        await prisma.option.delete({
+          where: { key: 'max_comment_depth' },
+        });
+      }
+    }
   });
 
   it('enforces comment deletion permissions and validates UUIDs', async () => {

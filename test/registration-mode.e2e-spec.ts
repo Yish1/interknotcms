@@ -107,4 +107,26 @@ describe('Registration mode option (e2e)', () => {
       })
       .expect(403);
   });
+
+  it('writes the default registration mode when the option is missing', async () => {
+    await prisma.option.deleteMany({
+      where: { key: 'registration_mode' },
+    });
+
+    await request(app.getHttpServer())
+      .post('/api/users')
+      .send({
+        username: `missing_${runId}`,
+        email: `missing_${runId}@example.com`,
+        password: 'Registration123!',
+      })
+      .expect(403);
+
+    await expect(
+      prisma.option.findUnique({
+        where: { key: 'registration_mode' },
+        select: { value: true },
+      }),
+    ).resolves.toEqual({ value: 'ADMIN_ONLY' });
+  });
 });

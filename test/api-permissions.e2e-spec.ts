@@ -19,6 +19,7 @@ describe('Guest and user API permissions (e2e)', () => {
   let adminId: string;
   let userId: string;
   let userToken: string;
+  let adminToken: string;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -65,6 +66,12 @@ describe('Guest and user API permissions (e2e)', () => {
       role: user.role,
       authVersion: user.authVersion,
     });
+    adminToken = await jwtService.signAsync({
+      sub: admin.id,
+      username: admin.username,
+      role: admin.role,
+      authVersion: admin.authVersion,
+    });
     await prisma.post.create({
       data: {
         publicId,
@@ -91,6 +98,30 @@ describe('Guest and user API permissions (e2e)', () => {
       });
     }
     await app?.close();
+  });
+
+  describe('admin', () => {
+    it('paginates the user list', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/api/users?page=1&pageSize=1')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
+
+      expect(response.body.data).toHaveLength(1);
+      expect(response.body.pagination).toMatchObject({
+        page: 1,
+        pageSize: 1,
+      });
+      expect(response.body.pagination.total).toBeGreaterThanOrEqual(2);
+      expect(response.body.pagination.totalPages).toBe(
+        response.body.pagination.total,
+      );
+
+      await request(app.getHttpServer())
+        .get('/api/users?page=0&pageSize=51')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(400);
+    });
   });
 
   describe('guest', () => {

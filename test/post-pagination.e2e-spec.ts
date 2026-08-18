@@ -83,7 +83,9 @@ describe('Post pagination (e2e)', () => {
           status: 'published' as const,
           viewCount: 2_000_000,
           publishedAt: new Date(`2099-01-0${3 - index}T00:00:00.000Z`),
-          updatedAt: new Date(`2099-02-0${3 - index}T00:00:00.000Z`),
+          updatedAt: new Date(
+            index < 2 ? '2099-02-03T00:00:00.000Z' : '2099-02-01T00:00:00.000Z',
+          ),
           authorId: editor.id,
         })),
         ...publicIds.slice(3, 6).map((publicId, index) => ({
@@ -133,26 +135,24 @@ describe('Post pagination (e2e)', () => {
       .get('/api/posts?page=1&pageSize=2&sort=views')
       .expect(200);
 
-    expect(firstPage.body.data.posts).toHaveLength(2);
+    expect(firstPage.body.data).toHaveLength(2);
     expect(
-      firstPage.body.data.posts.map(
-        (post: { publicId: string }) => post.publicId,
-      ),
-    ).toEqual(publicIds.slice(0, 2));
-    expect(firstPage.body.data.pagination).toMatchObject({
+      firstPage.body.data.map((post: { publicId: string }) => post.publicId),
+    ).toEqual([publicIds[1], publicIds[0]]);
+    expect(firstPage.body.pagination).toMatchObject({
       page: 1,
       pageSize: 2,
     });
-    expect(firstPage.body.data.pagination.totalPages).toBe(
-      Math.ceil(firstPage.body.data.pagination.total / 2),
+    expect(firstPage.body.pagination.totalPages).toBe(
+      Math.ceil(firstPage.body.pagination.total / 2),
     );
 
     const secondPage = await request(app.getHttpServer())
       .get('/api/posts?page=2&pageSize=2&sort=views')
       .expect(200);
 
-    expect(secondPage.body.data.posts[0].publicId).toBe(publicIds[2]);
-    expect(secondPage.body.data.posts).toHaveLength(2);
+    expect(secondPage.body.data[0].publicId).toBe(publicIds[2]);
+    expect(secondPage.body.data).toHaveLength(2);
   });
 
   it('rejects invalid public pagination parameters', async () => {

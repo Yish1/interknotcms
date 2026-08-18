@@ -10,6 +10,11 @@ import { CreateUserDto } from './dto/create-user.dto.js';
 import { UpdateUserDto } from './dto/update-user.dto.js';
 import * as argon2 from 'argon2';
 import { Prisma } from '../../generated/prisma/client.js';
+import { UserListQueryDto } from './dto/user-list-query.dto.js';
+import {
+  createPaginationMeta,
+  getPagination,
+} from '../../common/utils/post-pagination.js';
 
 @Injectable()
 export class UsersService {
@@ -35,17 +40,31 @@ export class UsersService {
     lastLoginAt: true,
   };
 
-  async findAll(currentUser: { sub: string; role: string }) {
+  async findAll(
+    query: UserListQueryDto,
+    currentUser: { sub: string; role: string },
+  ) {
     if (currentUser.role !== 'admin') {
       throw new ForbiddenException('Permission denied');
     }
 
-    return this.prisma.user.findMany({
-      where: {
-        deletedAt: null,
-      },
-      select: this.privateUserSelect,
-    });
+    const { page, pageSize } = query;
+    const where: Prisma.UserWhereInput = { deletedAt: null };
+
+    const [users, total] = await Promise.all([
+      this.prisma.user.findMany({
+        where,
+        ...getPagination(page, pageSize),
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        select: this.privateUserSelect,
+      }),
+      this.prisma.user.count({ where }),
+    ]);
+
+    return {
+      users,
+      pagination: createPaginationMeta(page, pageSize, total),
+    };
   }
 
   async findOne(username: string, currentUser: { sub: string; role: string }) {
@@ -78,12 +97,14 @@ export class UsersService {
     createUserDto: CreateUserDto,
     currentUser?: { sub: string; role: string },
   ) {
-    const registrationOption = await this.prisma.option.findUnique({
+    const registrationOption = await this.prisma.option.upsert({
       where: { key: 'registration_mode' },
+      update: {},
+      create: { key: 'registration_mode', value: 'ADMIN_ONLY' },
       select: { value: true },
     });
 
-    // 配置缺失或值不合法时采用更安全的 ADMIN_ONLY 模式。
+    // 值不合法时采用更安全的 ADMIN_ONLY 模式。
     const registrationMode =
       registrationOption?.value === 'OPEN' ? 'OPEN' : 'ADMIN_ONLY';
 

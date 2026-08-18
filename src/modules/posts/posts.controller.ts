@@ -29,7 +29,7 @@ export class PostsController {
 
   @UseGuards(AuthGuard, LogThrottlerGuard)
   @ApiBearerAuth('access-token')
-  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @Post()
   async create(@Body() createPostDto: CreatePostDto, @Req() req: any) {
     const post = await this.postsService.createPost(createPostDto, req.user);
@@ -41,7 +41,7 @@ export class PostsController {
 
   @UseGuards(AuthGuard, LogThrottlerGuard)
   @ApiBearerAuth('access-token')
-  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @Post(':identifier/aliases')
   async createPostAlias(
     @Param('identifier') identifier: string,

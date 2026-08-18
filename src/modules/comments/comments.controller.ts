@@ -65,12 +65,19 @@ export class CommentsController {
   @Get('pending')
   @UseGuards(AuthGuard)
   @ApiBearerAuth('access-token')
-  async listPendingComments(@Req() req: any) {
-    const comments = await this.commentsService.listPendingComments(req.user);
+  async listPendingComments(
+    @Query() query: CommentListQueryDto,
+    @Req() req: any,
+  ) {
+    const result = await this.commentsService.listPendingComments(
+      query,
+      req.user,
+    );
 
     return {
       message: 'Pending comments retrieved successfully',
-      data: comments,
+      data: result.comments,
+      pagination: result.pagination,
     };
   }
 

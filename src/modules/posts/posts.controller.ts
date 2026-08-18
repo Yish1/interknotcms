@@ -60,12 +60,13 @@ export class PostsController {
     };
   }
 
-  @Get() // api/posts?page=x&pageSize=xx&sort=latest or views
+  @Get() // api/posts?page=x&pageSize=xx&sort=latest, views or updated
   async listPublicPosts(@Query() query: PostListQueryDto) {
     const posts = await this.postsService.ListPublicPosts(query);
     return {
       message: 'Public posts retrieved successfully',
-      data: posts,
+      data: posts.posts,
+      pagination: posts.pagination,
     };
   }
 
@@ -241,11 +242,12 @@ export class PostsController {
   }
 
   @Get('tags')
-  async listAllTags() {
-    const tags = await this.postsService.listAllTags();
+  async listAllTags(@Query() query: PostListQueryDto) {
+    const result = await this.postsService.listAllTags(query);
     return {
       message: 'All tags retrieved successfully',
-      data: tags,
+      data: result.tags,
+      pagination: result.pagination,
     };
   }
 

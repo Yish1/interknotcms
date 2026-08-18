@@ -12,10 +12,15 @@ import { randomBytes } from 'node:crypto';
 import { PostListQueryDto } from './dto/post-list-query.dto.js';
 import { ManagePostQueryDto } from './dto/post-list-query-manage.dto.js';
 import { UpdatePostDto } from './dto/update-post.dto.js';
+import {
+  createPaginationMeta,
+  getPagination,
+  getPostPagination,
+} from '../../common/utils/post-pagination.js';
 
 @Injectable()
 export class PostsService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   private deduplicateTags(tags: string[]): string[] {
     const seen = new Set<string>();
@@ -110,15 +115,15 @@ export class PostsService {
         },
         tags: uniqueTags.length
           ? {
-            create: uniqueTags.map((tag) => ({
-              tag: {
-                connectOrCreate: {
-                  where: { name: tag },
-                  create: { name: tag },
+              create: uniqueTags.map((tag) => ({
+                tag: {
+                  connectOrCreate: {
+                    where: { name: tag },
+                    create: { name: tag },
+                  },
                 },
-              },
-            })),
-          }
+              })),
+            }
           : undefined, // 如果有标签就关联标签，否则不关联
       },
     });
@@ -228,12 +233,7 @@ export class PostsService {
   async ListPublicPosts(query: PostListQueryDto) {
     const { page, pageSize, sort } = query;
 
-    const skip = (page - 1) * pageSize;
-
-    const orderBy: Prisma.PostOrderByWithRelationInput[] =
-      sort === 'views'
-        ? [{ viewCount: 'desc' }, { updatedAt: 'desc' }]
-        : [{ publishedAt: 'desc' }, { updatedAt: 'desc' }];
+    const paginationQuery = getPostPagination(page, pageSize, sort);
 
     const [posts, total] = await Promise.all([
       this.prisma.post.findMany({
@@ -241,9 +241,7 @@ export class PostsService {
           status: 'published',
           deletedAt: null,
         },
-        orderBy,
-        skip,
-        take: pageSize,
+        ...paginationQuery,
 
         select: {
           publicId: true,
@@ -285,12 +283,7 @@ export class PostsService {
         tags: post.tags.map((t) => t.tag.name),
       })),
 
-      pagination: {
-        page,
-        pageSize,
-        total,
-        totalPages: Math.ceil(total / pageSize),
-      },
+      pagination: createPaginationMeta(page, pageSize, total),
     };
   }
 
@@ -304,7 +297,7 @@ export class PostsService {
 
     const { page, pageSize, status } = query;
 
-    const skip = (page - 1) * pageSize;
+    const paginationQuery = getPostPagination(page, pageSize, 'updated');
 
     const where: Prisma.PostWhereInput = {
       ...(status === 'archived'
@@ -319,9 +312,7 @@ export class PostsService {
     const [posts, total] = await Promise.all([
       this.prisma.post.findMany({
         where,
-        orderBy: { updatedAt: 'desc' },
-        skip,
-        take: pageSize,
+        ...paginationQuery,
 
         select: {
           publicId: true,
@@ -362,24 +353,14 @@ export class PostsService {
         tags: post.tags.map((t) => t.tag.name),
       })),
 
-      pagination: {
-        page,
-        pageSize,
-        total,
-        totalPages: Math.ceil(total / pageSize),
-      },
+      pagination: createPaginationMeta(page, pageSize, total),
     };
   }
 
   async listPostsByTag(tag: string, query: PostListQueryDto) {
     const { page, pageSize, sort } = query;
 
-    const skip = (page - 1) * pageSize;
-
-    const orderBy: Prisma.PostOrderByWithRelationInput[] =
-      sort === 'views'
-        ? [{ viewCount: 'desc' }, { updatedAt: 'desc' }]
-        : [{ publishedAt: 'desc' }, { updatedAt: 'desc' }];
+    const paginationQuery = getPostPagination(page, pageSize, sort);
 
     const where: Prisma.PostWhereInput = {
       status: 'published',
@@ -397,9 +378,7 @@ export class PostsService {
     const [posts, total] = await Promise.all([
       this.prisma.post.findMany({
         where,
-        skip,
-        take: pageSize,
-        orderBy,
+        ...paginationQuery,
 
         select: {
           publicId: true,
@@ -438,12 +417,7 @@ export class PostsService {
         tags: post.tags.map((item) => item.tag.name),
       })),
 
-      pagination: {
-        page,
-        pageSize,
-        total,
-        totalPages: Math.ceil(total / pageSize),
-      },
+      pagination: createPaginationMeta(page, pageSize, total),
     };
   }
 
@@ -518,13 +492,23 @@ export class PostsService {
     });
   }
 
-  async listAllTags() {
-    const tags = await this.prisma.tag.findMany({
-      select: { name: true },
-      orderBy: { name: 'asc' },
-    });
+  async listAllTags(query: PostListQueryDto) {
+    const { page, pageSize } = query;
+    const paginationQuery = getPagination(page, pageSize);
 
-    return tags.map((tag) => tag.name);
+    const [tags, total] = await Promise.all([
+      this.prisma.tag.findMany({
+        ...paginationQuery,
+        select: { name: true },
+        orderBy: { name: 'asc' },
+      }),
+      this.prisma.tag.count(),
+    ]);
+
+    return {
+      tags: tags.map((tag) => tag.name),
+      pagination: createPaginationMeta(page, pageSize, total),
+    };
   }
 
   async deletePost(
@@ -741,26 +725,26 @@ export class PostsService {
 
         ...(authorId
           ? {
-            author: {
-              connect: { id: authorId },
-            },
-          }
+              author: {
+                connect: { id: authorId },
+              },
+            }
           : {}),
 
         ...(uniqueTags !== undefined
           ? {
-            tags: {
-              deleteMany: {},
-              create: uniqueTags.map((tag) => ({
-                tag: {
-                  connectOrCreate: {
-                    where: { name: tag },
-                    create: { name: tag },
+              tags: {
+                deleteMany: {},
+                create: uniqueTags.map((tag) => ({
+                  tag: {
+                    connectOrCreate: {
+                      where: { name: tag },
+                      create: { name: tag },
+                    },
                   },
-                },
-              })),
-            },
-          }
+                })),
+              },
+            }
           : {}),
       },
 
@@ -925,9 +909,7 @@ export class PostsService {
       where: {
         deletedAt: null,
 
-        ...(currentUser.role === 'admin'
-          ? {}
-          : { authorId: currentUser.sub }),
+        ...(currentUser.role === 'admin' ? {} : { authorId: currentUser.sub }),
 
         OR: [
           { publicId: identifier },

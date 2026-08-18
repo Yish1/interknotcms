@@ -7,6 +7,12 @@ import {
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { CreateCommentDto } from './dto/comment.dto.js';
 import { CommentListQueryDto } from './dto/comment-list-query.dto.js';
+import {
+  createPaginationMeta,
+  getPagination,
+} from '../../common/utils/post-pagination.js';
+
+const MAX_COMMENT_DEPTH = 50;
 
 export interface PublicCommentNode {
   id: string;
@@ -65,6 +71,32 @@ export class CommentsService {
       if (!parentComment || parentComment.postId !== post.id) {
         throw new BadRequestException('Invalid parent comment');
       }
+
+      const [depthResult] = await this.prisma.$queryRaw<
+        Array<{ depth: number }>
+      >`
+        WITH RECURSIVE comment_ancestors AS (
+          SELECT id, parent_id, 1 AS depth
+          FROM comments
+          WHERE id = ${parentId}::uuid
+
+          UNION ALL
+
+          SELECT parent.id, parent.parent_id, child.depth + 1
+          FROM comments AS parent
+          INNER JOIN comment_ancestors AS child
+            ON parent.id = child.parent_id
+          WHERE child.depth < ${MAX_COMMENT_DEPTH}
+        )
+        SELECT COALESCE(MAX(depth), 0)::int AS depth
+        FROM comment_ancestors
+      `;
+
+      if (depthResult.depth >= MAX_COMMENT_DEPTH) {
+        throw new BadRequestException(
+          `Comment nesting cannot exceed ${MAX_COMMENT_DEPTH} levels`,
+        );
+      }
     }
 
     const reviewOption = await this.prisma.option.findFirst({
@@ -73,10 +105,12 @@ export class CommentsService {
     });
 
     const needapprove =
-      currentUser.role === 'admin' || (currentUser.role === 'editor' && currentUser.sub === post.authorId);
+      currentUser.role === 'admin' ||
+      (currentUser.role === 'editor' && currentUser.sub === post.authorId);
     // 只接受 JSON 布尔值；配置缺失或类型错误时默认需要审批。
     const reviewRequired = reviewOption?.value !== false;
-    const commentStatus = reviewRequired && !needapprove ? 'pending' : 'approved';
+    const commentStatus =
+      reviewRequired && !needapprove ? 'pending' : 'approved';
 
     return await this.prisma.comment.create({
       data: {
@@ -111,7 +145,7 @@ export class CommentsService {
   async listPostComments(identifier: string, query: CommentListQueryDto) {
     const { page, pageSize } = query;
 
-    const skip = (page - 1) * pageSize;
+    const paginationQuery = getPagination(page, pageSize);
 
     const commentselect = {
       id: true,
@@ -154,9 +188,8 @@ export class CommentsService {
     const [rootComments, total] = await Promise.all([
       this.prisma.comment.findMany({
         where: rootWhere,
-        orderBy: [{createdAt: 'asc'}, {id: 'asc'}],
-        skip,
-        take: pageSize,
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+        ...paginationQuery,
         select: commentselect,
       }),
       this.prisma.comment.count({
@@ -175,14 +208,13 @@ export class CommentsService {
           parentId: { in: parentIds },
           status: 'approved',
         },
-        orderBy: [{createdAt: 'asc'}, {id: 'asc'}],
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
         select: commentselect,
-      })
+      });
 
       comments.push(...replies);
       parentIds = replies.map((comment) => comment.id);
     }
-
 
     const commentMap = new Map<string, PublicCommentNode>();
 
@@ -215,18 +247,11 @@ export class CommentsService {
       roots.push(comment);
     }
 
-    const totalPages = Math.ceil(total / pageSize);
-
     return {
       comments: roots,
-      pagination: {
-        total,
-        page,
-        pageSize,
-        totalPages,
-      },
-    }
-}
+      pagination: createPaginationMeta(page, pageSize, total),
+    };
+  }
 
   async listPendingComments(currentUser: { sub: string; role: string }) {
     if (currentUser.role !== 'admin' && currentUser.role !== 'editor') {
@@ -363,7 +388,7 @@ export class CommentsService {
   async restoreComment(
     commentId: string,
     currentUser: { sub: string; role: string },
-  ){
+  ) {
     const comment = await this.prisma.comment.findFirst({
       where: {
         id: commentId,
@@ -411,6 +436,4 @@ export class CommentsService {
       },
     });
   }
-
-
 }

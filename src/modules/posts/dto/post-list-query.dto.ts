@@ -22,6 +22,6 @@ export class PostListQueryDto {
   pageSize: number = 10;
 
   @IsOptional()
-  @IsIn(['latest', 'views'])
-  sort: 'latest' | 'views' = 'latest';
+  @IsIn(['latest', 'views', 'updated'])
+  sort: 'latest' | 'views' | 'updated' = 'latest';
 }

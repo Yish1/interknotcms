@@ -6,13 +6,15 @@ import {
 import * as argon2 from 'argon2';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { LoginDto } from './dto/login.dto.js';
-import { JwtService } from '@nestjs/jwt';
+import { AccessTokenService } from './access-token.service.js';
+import { RefreshTokenService } from './refresh-token.service.js';
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly jwtService: JwtService,
+    private readonly accessTokenService: AccessTokenService,
+    private readonly refreshTokenService: RefreshTokenService,
   ) {}
 
   async validateUser(loginDto: LoginDto) {
@@ -64,16 +66,37 @@ export class AuthService {
       },
     });
 
-    const payload = {
+    const authenticatedUser = {
       sub: user.id,
       username: user.username,
       role: user.role,
       authVersion: user.authVersion,
     };
-    const accessToken = await this.jwtService.signAsync(payload);
+
+    const [accessToken, refreshToken] = await Promise.all([
+      this.accessTokenService.create(authenticatedUser),
+      this.refreshTokenService.create(user.id, user.authVersion),
+    ]);
 
     return {
       user: profile,
+      accessToken,
+      refreshToken,
+    };
+  }
+
+  /** 使用Refresh Token生成新的Access Token。 */
+  async refresh(refreshToken: string) {
+    const user = await this.refreshTokenService.authenticate(refreshToken);
+
+    const accessToken = await this.accessTokenService.create({
+      sub: user.id,
+      username: user.username,
+      role: user.role,
+      authVersion: user.authVersion,
+    });
+
+    return {
       accessToken,
     };
   }

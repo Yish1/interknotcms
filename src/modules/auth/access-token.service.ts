@@ -6,6 +6,7 @@ import { PrismaService } from '../../prisma/prisma.service.js';
 interface AccessTokenPayload {
   sub: string;
   authVersion: number;
+  type: 'access';
 }
 
 export interface AuthenticatedUser {
@@ -22,6 +23,7 @@ export class AccessTokenService {
     private readonly prisma: PrismaService,
   ) {}
 
+  /** 从 Authorization 头中提取 Bearer Token */
   extractBearerToken(authorization: unknown): string | undefined {
     if (authorization === undefined) {
       return undefined;
@@ -40,6 +42,39 @@ export class AccessTokenService {
     return parts[1];
   }
 
+  /** 从Bearer请求头或Cookie中提取Access Token。 */
+  extractToken(
+    authorization: unknown,
+    cookieAccessToken: unknown,
+  ): string | undefined {
+    const bearerToken = this.extractBearerToken(authorization);
+
+    if (bearerToken) {
+      return bearerToken;
+    }
+
+    if (cookieAccessToken === undefined) {
+      return undefined;
+    }
+
+    if (typeof cookieAccessToken !== 'string') {
+      throw new UnauthorizedException('Invalid token');
+    }
+
+    return cookieAccessToken;
+  }
+
+  /** 为已经通过身份验证的用户创建Access Token */
+  async create(user: AuthenticatedUser): Promise<string> {
+    return this.jwtService.signAsync({
+      sub: user.sub,
+      username: user.username,
+      role: user.role,
+      authVersion: user.authVersion,
+      type: 'access',
+    });
+  }
+
   async authenticate(token: string): Promise<AuthenticatedUser> {
     let payload: AccessTokenPayload;
 
@@ -50,6 +85,7 @@ export class AccessTokenService {
     }
 
     if (
+      payload.type !== 'access' ||
       typeof payload.sub !== 'string' ||
       !isUUID(payload.sub) ||
       !Number.isInteger(payload.authVersion)
